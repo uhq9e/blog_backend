@@ -1,4 +1,4 @@
-use crate::{db, models::*, schema};
+use crate::{db, models::*, schema, AppState};
 use chrono;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use rocket::{get, http::Status, post, serde::json::Json, Route, State};
@@ -15,7 +15,7 @@ struct Claims {
 }
 
 #[post("/create_token")]
-pub fn create_token(db: &State<db::Pool>, token: Option<ApiToken>) -> Result<String, Status> {
+pub fn create_token(db: &State<db::Pool>, state: &State<AppState>, token: Option<ApiToken>) -> Result<String, Status> {
     let mut conn = db.get().unwrap();
     let token = token.ok_or(Status::Unauthorized)?;
 
@@ -31,11 +31,9 @@ pub fn create_token(db: &State<db::Pool>, token: Option<ApiToken>) -> Result<Str
         };
 
         let key = EncodingKey::from_secret(
-            env::var("JWT_SIGNING_KEY")
-                .expect("未设置JWT签名密钥")
-                .as_ref(),
+            state.jwt_signing_key.as_ref(),
         );
-        
+
         let new_token = format!(
             "Bearer {}",
             encode(&header, &claims, &key).map_err(|_| Status::InternalServerError)?
