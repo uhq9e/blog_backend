@@ -13,3 +13,7 @@ jsonwebtoken = "9.1.0"
 r2d2 = "0.8.10"
 rocket = { version = "0.5.0", features = ["json"] }
 serde = { version = "1.0.192", features = ["derive"] }
+
+[profile.release]
+strip = true
+lto = true
