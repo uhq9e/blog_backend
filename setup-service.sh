@@ -18,6 +18,9 @@ fi
 read -e -p 'DATABASE_URL: ' database_url
 read -e -p 'JWT_SIGNING_KEY: ' jwt_signing_key
 
+database_url=${database_url//\%/\%\%}
+jwt_signing_key=${jwt_signing_key//\%/\%\%}
+
 cat >$SERVICE_PATH <<-EOM
 [Unit]
 Description=uhqblog backend service
@@ -36,8 +39,8 @@ EOM
 
 cat >$ENV_FILE_PATH <<-EOM
 [Service]
-Environment="DATABASE_URL=${database_url//\%/\%\%}"
-Environment="JWT_SIGNING_KEY=${jwt_signing_key//\%/\%\%}"
+Environment="DATABASE_URL=$database_url"
+Environment="JWT_SIGNING_KEY=$jwt_signing_key"
 EOM
 
 echo "已存储服务到 $SERVICE_PATH"
