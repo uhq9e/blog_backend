@@ -24,7 +24,7 @@ jobs:
       uses: garygrossgarten/github-action-scp@release
       with:
         local: target/debug/blog_backend
-        remote: /root/test
+        remote: /root/test/blog_backend
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}
