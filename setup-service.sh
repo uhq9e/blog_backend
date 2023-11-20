@@ -36,7 +36,7 @@ EOM
 
 cat >$ENV_FILE_PATH <<-EOM
 [Service]
-Environment="DATABASE_URL=$database_url"
+Environment="DATABASE_URL=${database_url//\%/\%\%}"
 Environment="JWT_SIGNING_KEY=${jwt_signing_key//\%/\%\%}"
 EOM
 
