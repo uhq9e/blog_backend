@@ -13,15 +13,14 @@ cat >$SERVICE_PATH <<-EOM
 Description=uhqblog backend service
 After=network.target
 StartLimitIntervalSec=0
-RestartSec=5
 [Service]
 Type=simple
 Restart=always
 RestartSec=1
 User=root
 ExecStart=$EXECUTABLE_PATH
-Environment=DATABASE_URL=$database_url
-Environment=JWT_SIGNING_KEY=$jwt_signing_key
+Environment=DATABASE_URL="$database_url"
+Environment=JWT_SIGNING_KEY="$jwt_signing_key"
 
 [Install]
 WantedBy=multi-user.target
