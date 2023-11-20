@@ -20,11 +20,11 @@ jobs:
       run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
-    - name: Copy folder content recursively to vps
+    - name: Copy folder content recursively to vultr
       uses: garygrossgarten/github-action-scp@release
       with:
         local: target/release/blog_backend
-        remote: /root/release/blog_backend
+        remote: /root/backend/blog_backend
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         password: ${{ secrets.PASSWORD }}

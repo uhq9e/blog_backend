@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SERVICE_PATH="/etc/systemd/system/blog_backend.service"
-EXECUTABLE_PATH="/root/blog_backend/target/debug/blog_backend"
+EXECUTABLE_PATH="/root/backend/blog_backend"
 
 if [ ! -e $SERVICE_PATH ]; then
     touch $SERVICE_PATH
