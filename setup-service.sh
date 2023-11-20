@@ -18,7 +18,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 Restart=always
-RestartSec=1
+RestartSec=10
 User=root
 ExecStart=$EXECUTABLE_PATH
 Environment=DATABASE_URL="$database_url"
