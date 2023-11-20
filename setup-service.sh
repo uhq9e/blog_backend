@@ -5,8 +5,8 @@ if [ ! -e $SERVICE_PATH ]; then
     touch $SERVICE_PATH
 fi
 
-read -p 'DATABASE_URL: ' database_url
-read -p 'JWT_SIGNING_KEY: ' jwt_signing_key
+read -e -p 'DATABASE_URL: ' database_url
+read -e -p 'JWT_SIGNING_KEY: ' jwt_signing_key
 
 cat >$SERVICE_PATH <<-EOM
 [Unit]
