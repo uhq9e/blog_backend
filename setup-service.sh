@@ -1,3 +1,5 @@
+#!/bin/bash
+
 SERVICE_PATH="/etc/systemd/system/blog_backend.service"
 EXECUTABLE_PATH="/root/blog_backend/target/debug/blog_backend"
 
