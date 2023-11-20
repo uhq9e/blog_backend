@@ -36,8 +36,8 @@ EOM
 
 cat >$ENV_FILE_PATH <<-EOM
 [Service]
-Environment="DATABASE_URL=$database_url"
-Environment="JWT_SIGNING_KEY=$jwt_signing_key"
+Environment="DATABASE_URL="$database_url""
+Environment="JWT_SIGNING_KEY="$jwt_signing_key""
 EOM
 
 echo "已存储服务到 $SERVICE_PATH"
