@@ -26,7 +26,7 @@ use crate::{
 
 const IMAGE_PREFIX: &'static str = "image/";
 
-#[post("/", data = "<file>")]
+#[post("/item", data = "<file>")]
 async fn create_object(
     app_state: &State<AppState>,
     auth: Option<ApiTokenClaims>,
@@ -108,7 +108,7 @@ async fn create_object(
     Ok(Json(InsertResponse { id: md5_ }))
 }
 
-#[get("/<id>")]
+#[get("/item/<id>")]
 async fn get_object(db: &State<db::Pool>, id: String) -> Result<Json<LocalFile>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
@@ -127,7 +127,7 @@ async fn get_object(db: &State<db::Pool>, id: String) -> Result<Json<LocalFile>,
     ))
 }
 
-#[delete("/<id>")]
+#[delete("/item/<id>")]
 async fn delete_object(
     app_state: &State<AppState>,
     db: &State<db::Pool>,

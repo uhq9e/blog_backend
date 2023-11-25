@@ -13,7 +13,7 @@ use diesel::{
 };
 use diesel_async::RunQueryDsl;
 
-#[get("/?<pg..>")]
+#[get("/item?<pg..>")]
 async fn list_authors(db: &State<db::Pool>, pg: Pagination) -> Result<Json<Vec<Author>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
     let authors = schema::authors::table
@@ -26,7 +26,7 @@ async fn list_authors(db: &State<db::Pool>, pg: Pagination) -> Result<Json<Vec<A
     Ok(Json(authors))
 }
 
-#[get("/<id>")]
+#[get("/item/<id>")]
 async fn get_author(db: &State<db::Pool>, id: i32) -> Result<Json<Author>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
@@ -58,7 +58,7 @@ struct NewAuthorForm {
     urls: Vec<String>,
 }
 
-#[post("/", data = "<data>")]
+#[post("/item", data = "<data>")]
 async fn create_author(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,
@@ -83,7 +83,7 @@ struct UpdateAuthorForm {
     urls: Option<Vec<String>>,
 }
 
-#[put("/<id>", data = "<data>")]
+#[put("/item/<id>", data = "<data>")]
 async fn update_author(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,
@@ -115,7 +115,7 @@ async fn update_author(
     Ok(Json(UpdateResponse { id }))
 }
 
-#[delete("/<id>")]
+#[delete("/item/<id>")]
 async fn delete_author(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,

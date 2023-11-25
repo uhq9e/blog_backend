@@ -25,7 +25,7 @@ struct ImageItemFull {
     local_files: Vec<LocalFile>,
 }
 
-#[get("/?<date>&<author_id>&<pg..>")]
+#[get("/item?<date>&<author_id>&<pg..>")]
 async fn list_image_items(
     db: &State<db::Pool>,
     date: Option<String>,
@@ -88,7 +88,7 @@ async fn list_image_items(
     Ok(Json(results))
 }
 
-#[get("/<id>")]
+#[get("/item/<id>")]
 async fn get_image_item(db: &State<db::Pool>, id: i32) -> Result<Json<ImageItemFull>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
@@ -134,7 +134,7 @@ struct NewImageItemForm {
     date: NaiveDate,
 }
 
-#[post("/", data = "<data>")]
+#[post("/item", data = "<data>")]
 async fn create_image_item(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,
@@ -197,7 +197,7 @@ struct UpdateImageItemForm {
     author_id: Option<i32>,
 }
 
-#[put("/<id>", data = "<data>")]
+#[put("/item/<id>", data = "<data>")]
 async fn update_image_item(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,
@@ -229,7 +229,7 @@ async fn update_image_item(
     Ok(Json(UpdateResponse { id }))
 }
 
-#[delete("/<id>")]
+#[delete("/item/<id>")]
 async fn delete_image_item(
     db: &State<db::Pool>,
     auth: Option<ApiTokenClaims>,
