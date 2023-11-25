@@ -6,23 +6,22 @@ CREATE TABLE authors (
 
 CREATE TABLE image_items (
     id SERIAL4 PRIMARY KEY,
+    urls TEXT[] NULL,
     "date" date NOT NULL DEFAULT CURRENT_DATE,
     author_id INT4 NULL REFERENCES authors(id) ON DELETE SET NULL
 );
 
-CREATE TABLE social_posts (
-    id SERIAL4 PRIMARY KEY,
-    "type" INT4 NOT NULL,
-    url text NOT NULL,
-    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE
-);
-
 CREATE TABLE local_files (
-    id SERIAL4 PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     file_name TEXT NULL,
     "path" TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE image_items_local_files (
+    id SERIAL4 NOT NULL PRIMARY KEY,
+    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE,
+    local_file_id TEXT NOT NULL REFERENCES local_files(id) ON DELETE CASCADE
 );
 
 CREATE TABLE image_collections (
@@ -32,8 +31,8 @@ CREATE TABLE image_collections (
 );
 
 CREATE TABLE image_collections_image_items (
+    id SERIAL4 NOT NULL PRIMARY KEY,
     image_collection_id INT4 NOT NULL REFERENCES image_collections(id) ON DELETE CASCADE,
-    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE,
-    PRIMARY KEY (image_collection_id, image_item_id)
+    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE
 );
 

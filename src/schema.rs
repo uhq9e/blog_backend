@@ -1,14 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    api_tokens (token) {
-        token -> Text,
-        admin -> Bool,
-        created_at -> Timestamptz,
-    }
-}
-
-diesel::table! {
     authors (id) {
         id -> Int4,
         name -> Text,
@@ -25,7 +17,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    image_collections_image_items (image_collection_id, image_item_id) {
+    image_collections_image_items (id) {
+        id -> Int4,
         image_collection_id -> Int4,
         image_item_id -> Int4,
     }
@@ -34,43 +27,40 @@ diesel::table! {
 diesel::table! {
     image_items (id) {
         id -> Int4,
+        urls -> Nullable<Array<Nullable<Text>>>,
         date -> Date,
         author_id -> Nullable<Int4>,
     }
 }
 
 diesel::table! {
-    local_files (id) {
+    image_items_local_files (id) {
         id -> Int4,
-        file_name -> Nullable<Text>,
-        path -> Text,
-        created_at -> Timestamptz,
         image_item_id -> Int4,
+        local_file_id -> Text,
     }
 }
 
 diesel::table! {
-    social_posts (id) {
-        id -> Int4,
-        #[sql_name = "type"]
-        type_ -> Int4,
-        url -> Text,
-        image_item_id -> Int4,
+    local_files (id) {
+        id -> Text,
+        file_name -> Nullable<Text>,
+        path -> Text,
+        created_at -> Timestamptz,
     }
 }
 
 diesel::joinable!(image_collections_image_items -> image_collections (image_collection_id));
 diesel::joinable!(image_collections_image_items -> image_items (image_item_id));
 diesel::joinable!(image_items -> authors (author_id));
-diesel::joinable!(local_files -> image_items (image_item_id));
-diesel::joinable!(social_posts -> image_items (image_item_id));
+diesel::joinable!(image_items_local_files -> image_items (image_item_id));
+diesel::joinable!(image_items_local_files -> local_files (local_file_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    api_tokens,
     authors,
     image_collections,
     image_collections_image_items,
     image_items,
+    image_items_local_files,
     local_files,
-    social_posts,
 );

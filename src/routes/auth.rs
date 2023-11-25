@@ -1,33 +1,22 @@
-use crate::{db, models::*, schema, AppState};
+use crate::{utils::{ApiTokenClaims, ApiTokenError}, AppState};
 use chrono;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use rocket::{get, http::Status, post, serde::json::Json, Route, State};
-use serde::{Deserialize, Serialize};
-use std::env;
-
-use diesel::{insert_into, ExpressionMethods, QueryDsl, RunQueryDsl, SelectableHelper};
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    iat: i64,
-    exp: i64,
-    iss: String,
-}
 
 #[post("/create_token")]
-pub fn create_token(db: &State<db::Pool>, state: &State<AppState>, token: Option<ApiToken>) -> Result<String, Status> {
-    let mut conn = db.get().unwrap();
-    let token = token.ok_or(Status::Unauthorized)?;
+pub fn create_token(state: &State<AppState>, auth: Result<ApiTokenClaims, ApiTokenError>) -> Result<String, Status> {
+    let auth = auth.map_err(|_| Status::Unauthorized)?;
 
-    if token.admin {
+    if auth.admin {
         let now = chrono::offset::Utc::now();
 
         let header = Header::new(Algorithm::HS512);
 
-        let claims = Claims {
+        let claims = ApiTokenClaims {
             iat: now.timestamp(),
             iss: "uhq_blog".into(),
-            exp: 4102444800, // 2100-01-01 00:00:00
+            exp: now.timestamp() + 3153600000, // 100 years later
+            admin: false
         };
 
         let key = EncodingKey::from_secret(
@@ -38,15 +27,6 @@ pub fn create_token(db: &State<db::Pool>, state: &State<AppState>, token: Option
             "Bearer {}",
             encode(&header, &claims, &key).map_err(|_| Status::InternalServerError)?
         );
-
-        insert_into(schema::api_tokens::table)
-            .values(ApiToken {
-                token: new_token.clone(),
-                admin: false,
-                created_at: now,
-            })
-            .execute(&mut conn)
-            .map_err(|_| Status::InternalServerError)?;
 
         Ok(new_token)
     } else {

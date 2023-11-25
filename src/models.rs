@@ -2,11 +2,13 @@
 
 use crate::schema::*;
 use crate::utils::{datetime_format, naive_date_format};
+use diesel::dsl::*;
+use diesel::backend::Backend;
 use diesel::prelude::*;
+use diesel::query_dsl::methods::SelectDsl;
 use serde::{Deserialize, Serialize};
 
-use chrono::{NaiveDate, Utc, DateTime};
-
+use chrono::{DateTime, NaiveDate, Utc};
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Deserialize, Serialize)]
 pub struct Author {
@@ -23,50 +25,81 @@ pub struct ImageCollection {
     pub date: NaiveDate,
 }
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Associations, Deserialize, Serialize)]
+#[derive(
+    Queryable,
+    Selectable,
+    Insertable,
+    Debug,
+    Clone,
+    Identifiable,
+    Associations,
+    Deserialize,
+    Serialize,
+)]
 #[diesel(belongs_to(ImageCollection))]
 #[diesel(belongs_to(ImageItem))]
 #[diesel(primary_key(image_collection_id, image_item_id))]
-pub struct ImageCollectionsImageItem {
+#[diesel(table_name = image_collections_image_items)]
+pub struct ImageCollectionImageItem {
+    pub id: i32,
     pub image_collection_id: i32,
     pub image_item_id: i32,
 }
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Associations, Deserialize, Serialize)]
+#[derive(
+    Queryable,
+    Selectable,
+    Insertable,
+    Debug,
+    Clone,
+    Identifiable,
+    Associations,
+    Deserialize,
+    Serialize,
+)]
 #[diesel(belongs_to(Author))]
 pub struct ImageItem {
     pub id: i32,
+    pub urls: Option<Vec<Option<String>>>,
     #[serde(with = "naive_date_format")]
     pub date: NaiveDate,
     pub author_id: Option<i32>,
 }
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Associations, Serialize, Deserialize)]
-#[diesel(belongs_to(ImageItem))]
+#[derive(
+    Queryable,
+    Selectable,
+    Insertable,
+    Debug,
+    Clone,
+    Identifiable,
+    Serialize,
+    Deserialize,
+)]
 pub struct LocalFile {
-    pub id: i32,
+    pub id: String,
     pub file_name: Option<String>,
     pub path: String,
     #[serde(with = "datetime_format")]
     pub created_at: DateTime<Utc>,
-    pub image_item_id: i32,
 }
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Associations, Deserialize, Serialize)]
+#[derive(
+    Queryable,
+    Selectable,
+    Insertable,
+    Debug,
+    Clone,
+    Identifiable,
+    Associations,
+    Serialize,
+    Deserialize,
+)]
 #[diesel(belongs_to(ImageItem))]
-pub struct SocialPost {
+#[diesel(belongs_to(LocalFile))]
+#[diesel(table_name = image_items_local_files)]
+pub struct ImageItemLocalFile {
     pub id: i32,
-    #[serde(rename = "type")]
-    pub type_: i32,
-    pub url: String,
     pub image_item_id: i32,
-}
-
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Deserialize, Serialize)]
-#[diesel(primary_key(token))]
-pub struct ApiToken {
-    pub token: String,
-    pub admin: bool,
-    #[serde(with = "datetime_format")]
-    pub created_at: DateTime<Utc>,
+    pub local_file_id: String,
 }
