@@ -1,5 +1,8 @@
-use aws_sdk_s3::primitives::ByteStream;
-use diesel::{delete, insert_into, result::Error as ResultError, ExpressionMethods, QueryDsl};
+use aws_sdk_s3::{
+    operation::{delete_object::DeleteObjectError, put_object::PutObjectError},
+    primitives::ByteStream,
+};
+use diesel::{delete, insert_into, ExpressionMethods, QueryDsl};
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use md5;
 use rocket::{
@@ -19,12 +22,18 @@ use crate::{
     schema,
     utils::{
         response::{DeleteResponse, InsertResponse},
-        ApiTokenClaims,
+        result_error_to_status, transaction_error_to_status, ApiTokenClaims, TransactionError,
     },
     AppState, BUCKET,
 };
 
 const IMAGE_PREFIX: &'static str = "image/";
+
+impl<T> From<diesel::result::Error> for TransactionError<T> {
+    fn from(value: diesel::result::Error) -> Self {
+        Self::ResultError(value)
+    }
+}
 
 #[post("/item", data = "<file>")]
 async fn create_object(
@@ -52,7 +61,9 @@ async fn create_object(
         .map_err(|_| Status::InternalServerError)?;
 
     if !objs.is_empty() {
-        return Ok(Json(InsertResponse { id: objs[0].id.to_owned() }));
+        return Ok(Json(InsertResponse {
+            id: objs[0].id.to_owned(),
+        }));
     }
 
     let filename = if let Some(content_type) = file.content_type() {
@@ -69,7 +80,7 @@ async fn create_object(
 
     let md5_ = md5.to_owned();
 
-    conn.transaction::<(), ResultError, _>(|conn| {
+    conn.transaction::<(), TransactionError<PutObjectError>, _>(|conn| {
         let content_type = file
             .content_type()
             .or(Some(&ContentType::Binary))
@@ -84,7 +95,8 @@ async fn create_object(
                     schema::local_files::path.eq(&key),
                 ))
                 .execute(conn)
-                .await?;
+                .await
+                .map_err(|err| TransactionError::ResultError(err))?;
 
             app_state
                 .s3_client
@@ -96,14 +108,14 @@ async fn create_object(
                 .key(&key)
                 .send()
                 .await
-                .map_err(|_| ResultError::RollbackTransaction)?;
+                .map_err(|err| TransactionError::SdkError(err))?;
 
             Ok(())
         }
         .scope_boxed()
     })
     .await
-    .map_err(|_| Status::InternalServerError)?;
+    .map_err(transaction_error_to_status)?;
 
     Ok(Json(InsertResponse { id: md5_ }))
 }
@@ -117,13 +129,7 @@ async fn get_object(db: &State<db::Pool>, id: String) -> Result<Json<LocalFile>,
             .find(id)
             .first::<LocalFile>(&mut conn)
             .await
-            .map_err(|err| {
-                if let ResultError::NotFound = err {
-                    Status::NotFound
-                } else {
-                    Status::InternalServerError
-                }
-            })?,
+            .map_err(result_error_to_status)?,
     ))
 }
 
@@ -141,22 +147,17 @@ async fn delete_object(
         .find(&id)
         .first::<LocalFile>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
     let id_ = id.to_owned();
 
-    conn.transaction::<(), ResultError, _>(|conn| {
+    conn.transaction::<(), TransactionError<DeleteObjectError>, _>(|conn| {
         async move {
             delete(schema::local_files::table)
                 .filter(schema::local_files::id.eq(id_))
                 .execute(conn)
-                .await?;
+                .await
+                .map_err(|err| TransactionError::ResultError(err))?;
 
             app_state
                 .s3_client
@@ -165,14 +166,14 @@ async fn delete_object(
                 .key(obj.path)
                 .send()
                 .await
-                .map_err(|_| ResultError::RollbackTransaction)?;
+                .map_err(|err| TransactionError::SdkError(err))?;
 
             Ok(())
         }
         .scope_boxed()
     })
     .await
-    .map_err(|_| Status::InternalServerError)?;
+    .map_err(transaction_error_to_status)?;
 
     Ok(Json(DeleteResponse { id }))
 }

@@ -1,4 +1,6 @@
 use crate::AppState;
+use aws_sdk_s3::{error::SdkError, primitives::SdkBody};
+use aws_smithy_runtime_api::http::Response;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use regex::Regex;
 use rocket::{
@@ -23,12 +25,48 @@ pub enum ApiTokenError {
     FormatError,
 }
 
+pub enum TransactionError<T> {
+    ResultError(diesel::result::Error),
+    SdkError(SdkError<T, Response<SdkBody>>),
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiTokenClaims {
     pub iat: i64,
     pub exp: i64,
     pub iss: String,
     pub admin: bool,
+}
+
+pub fn sdk_error_to_status<T>(err: SdkError<T, Response<SdkBody>>) -> Status {
+    if let SdkError::ServiceError(_) = err {
+        Status::FailedDependency
+    } else {
+        Status::BadGateway
+    }
+}
+
+pub fn result_error_to_status(err: diesel::result::Error) -> Status {
+    if let diesel::result::Error::NotFound = err {
+        Status::NotFound
+    } else {
+        Status::InternalServerError
+    }
+}
+
+pub fn result_error_to_status_failed_dependency(err: diesel::result::Error) -> Status {
+    if let diesel::result::Error::NotFound = err {
+        Status::FailedDependency
+    } else {
+        Status::InternalServerError
+    }
+}
+
+pub fn transaction_error_to_status<T>(err: TransactionError<T>) -> Status {
+    match err {
+        TransactionError::SdkError(err) => sdk_error_to_status(err),
+        TransactionError::ResultError(err) => result_error_to_status(err),
+    }
 }
 
 #[rocket::async_trait]
@@ -139,7 +177,9 @@ pub mod naive_date_format_option {
     where
         S: Serializer,
     {
-        if date.is_none() {return serializer.serialize_none()};
+        if date.is_none() {
+            return serializer.serialize_none();
+        };
         let date = date.unwrap();
 
         let s = format!("{}", date.format(FORMAT));

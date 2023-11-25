@@ -4,15 +4,20 @@ use crate::{
     db,
     models::*,
     schema,
-    utils::{naive_date_format, naive_date_format_option, response::*, ApiTokenClaims, Pagination},
+    utils::{
+        naive_date_format, naive_date_format_option, response::*, result_error_to_status,
+        result_error_to_status_failed_dependency, sdk_error_to_status, transaction_error_to_status,
+        ApiTokenClaims, Pagination, TransactionError,
+    },
 };
+use aws_sdk_s3::operation::put_object::PutObjectError;
 use chrono::NaiveDate;
 use itertools::izip;
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, Route, State};
 use serde::{Deserialize, Serialize};
 
 use diesel::{
-    delete, insert_into, result::Error as ResultError, update, AsChangeset, BelongingToDsl,
+    delete, insert_into, result::DatabaseErrorKind, update, AsChangeset, BelongingToDsl,
     ExpressionMethods, GroupedBy, QueryDsl, SelectableHelper,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
@@ -96,13 +101,7 @@ async fn get_image_item(db: &State<db::Pool>, id: i32) -> Result<Json<ImageItemF
         .find(id)
         .first::<ImageItem>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
     let item: (ImageItem, Option<Author>) = schema::image_items::table
         .filter(schema::image_items::id.eq(id))
@@ -128,7 +127,7 @@ async fn get_image_item(db: &State<db::Pool>, id: i32) -> Result<Json<ImageItemF
 #[derive(Deserialize)]
 struct NewImageItemForm {
     author_id: i32,
-    local_file_id: Option<String>,
+    local_file_ids: Option<Vec<String>>,
     urls: Vec<String>,
     #[serde(with = "naive_date_format")]
     date: NaiveDate,
@@ -144,7 +143,7 @@ async fn create_image_item(
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
     let image_item_id = conn
-        .transaction::<i32, ResultError, _>(|conn| {
+        .transaction::<i32, TransactionError<PutObjectError>, _>(|conn| {
             async move {
                 let image_item_id = insert_into(schema::image_items::table)
                     .values((
@@ -154,21 +153,26 @@ async fn create_image_item(
                     ))
                     .returning(schema::image_items::id)
                     .get_result::<i32>(conn)
-                    .await?;
+                    .await
+                    .map_err(|err| TransactionError::ResultError(err))?;
 
-                if let Some(local_file_id) = data.local_file_id.to_owned() {
-                    schema::local_files::table
-                        .find(&local_file_id)
-                        .first::<LocalFile>(conn)
-                        .await?;
+                if let Some(local_file_ids) = data.local_file_ids.to_owned() {
+                    for local_file_id in local_file_ids {
+                        schema::local_files::table
+                            .find(&local_file_id)
+                            .first::<LocalFile>(conn)
+                            .await
+                            .map_err(|err| TransactionError::ResultError(err))?;
 
-                    insert_into(schema::image_items_local_files::table)
-                        .values((
-                            schema::image_items_local_files::image_item_id.eq(image_item_id),
-                            schema::image_items_local_files::local_file_id.eq(local_file_id),
-                        ))
-                        .execute(conn)
-                        .await?;
+                        insert_into(schema::image_items_local_files::table)
+                            .values((
+                                schema::image_items_local_files::image_item_id.eq(image_item_id),
+                                schema::image_items_local_files::local_file_id.eq(local_file_id),
+                            ))
+                            .execute(conn)
+                            .await
+                            .map_err(|err| TransactionError::ResultError(err))?;
+                    }
                 }
 
                 Ok(image_item_id)
@@ -176,25 +180,45 @@ async fn create_image_item(
             .scope_boxed()
         })
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::FailedDependency
-            } else {
-                Status::InternalServerError
-            }
+        .map_err(|err| match err {
+            TransactionError::SdkError(err) => sdk_error_to_status(err),
+            TransactionError::ResultError(err) => result_error_to_status_failed_dependency(err),
         })?;
 
     Ok(Json(InsertResponse { id: image_item_id }))
 }
 
-// TODO: 加修改local file
-#[derive(Deserialize, AsChangeset)]
-#[diesel(table_name = schema::image_items)]
+#[derive(Deserialize, Clone, Debug)]
 struct UpdateImageItemForm {
+    local_file_ids: Option<Vec<String>>,
     urls: Option<Vec<String>>,
-    #[serde(with = "naive_date_format_option")]
+    #[serde(with = "naive_date_format_option", default)]
     date: Option<NaiveDate>,
     author_id: Option<i32>,
+}
+
+#[derive(AsChangeset)]
+#[diesel(table_name = schema::image_items)]
+struct ImageItemForUpdate {
+    urls: Option<Vec<String>>,
+    date: Option<NaiveDate>,
+    author_id: Option<i32>,
+}
+
+impl From<UpdateImageItemForm> for ImageItemForUpdate {
+    fn from(value: UpdateImageItemForm) -> Self {
+        Self {
+            urls: value.urls,
+            date: value.date,
+            author_id: value.author_id,
+        }
+    }
+}
+
+impl ImageItemForUpdate {
+    fn is_empty(&self) -> bool {
+        self.urls.is_none() || self.date.is_none() || self.author_id.is_none()
+    }
 }
 
 #[put("/item/<id>", data = "<data>")]
@@ -207,24 +231,62 @@ async fn update_image_item(
     auth.ok_or(Status::Forbidden)?;
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
+    let data = data.deref();
+
+    let update_data: ImageItemForUpdate = data.to_owned().into();
+
     schema::image_items::table
         .find(id)
         .first::<ImageItem>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
-    update(schema::image_items::table)
-        .filter(schema::image_items::id.eq(id))
-        .set(data.deref())
-        .execute(&mut conn)
-        .await
-        .map_err(|_| Status::InternalServerError)?;
+    conn.transaction::<(), diesel::result::Error, _>(|conn| {
+        let data = data.to_owned();
+        async move {
+            if !update_data.is_empty() {
+                update(schema::image_items::table)
+                    .filter(schema::image_items::id.eq(id))
+                    .set(update_data)
+                    .execute(conn)
+                    .await?;
+            };
+
+            if let Some(local_file_ids) = data.local_file_ids {
+                delete(schema::image_items_local_files::table)
+                    .filter(schema::image_items_local_files::image_item_id.eq(id))
+                    .execute(conn)
+                    .await?;
+
+                insert_into(schema::image_items_local_files::table)
+                    .values(
+                        local_file_ids
+                            .iter()
+                            .map(|v| {
+                                (
+                                    schema::image_items_local_files::image_item_id.eq(id),
+                                    schema::image_items_local_files::local_file_id.eq(v),
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .execute(conn)
+                    .await?;
+            }
+
+            Ok(())
+        }
+        .scope_boxed()
+    })
+    .await
+    .map_err(|err| {
+        if let diesel::result::Error::DatabaseError(DatabaseErrorKind::ForeignKeyViolation, _) = err
+        {
+            Status::UnprocessableEntity
+        } else {
+            Status::InternalServerError
+        }
+    })?;
 
     Ok(Json(UpdateResponse { id }))
 }
@@ -242,13 +304,7 @@ async fn delete_image_item(
         .find(id)
         .first::<ImageItem>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
     delete(schema::image_items::table.filter(schema::image_items::id.eq(id)))
         .execute(&mut conn)

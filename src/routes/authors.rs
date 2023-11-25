@@ -2,14 +2,14 @@ use crate::{
     db,
     models::*,
     schema,
-    utils::{response::*, ApiTokenClaims, Pagination},
+    utils::{response::*, result_error_to_status, ApiTokenClaims, Pagination},
 };
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, Route, State};
 use serde::Deserialize;
 
 use diesel::{
-    delete, insert_into, prelude::Insertable, query_builder::AsChangeset,
-    result::Error as ResultError, update, ExpressionMethods, QueryDsl,
+    delete, insert_into, prelude::Insertable, query_builder::AsChangeset, update,
+    ExpressionMethods, QueryDsl,
 };
 use diesel_async::RunQueryDsl;
 
@@ -34,13 +34,7 @@ async fn get_author(db: &State<db::Pool>, id: i32) -> Result<Json<Author>, Statu
         .find(id)
         .first::<Author>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
     let author = schema::authors::table
         .filter(schema::authors::id.eq(id))
@@ -83,6 +77,12 @@ struct UpdateAuthorForm {
     urls: Option<Vec<String>>,
 }
 
+impl UpdateAuthorForm {
+    fn is_empty(&self) -> bool {
+        self.name.is_none() || self.urls.is_none()
+    }
+}
+
 #[put("/item/<id>", data = "<data>")]
 async fn update_author(
     db: &State<db::Pool>,
@@ -97,20 +97,16 @@ async fn update_author(
         .find(id)
         .first::<Author>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
-    update(schema::authors::table)
-        .filter(schema::authors::id.eq(id))
-        .set(data.into_inner())
-        .execute(&mut conn)
-        .await
-        .map_err(|_| Status::InternalServerError)?;
+    if !data.is_empty() {
+        update(schema::authors::table)
+            .filter(schema::authors::id.eq(id))
+            .set(data.into_inner())
+            .execute(&mut conn)
+            .await
+            .map_err(|_| Status::InternalServerError)?;
+    };
 
     Ok(Json(UpdateResponse { id }))
 }
@@ -128,13 +124,7 @@ async fn delete_author(
         .find(id)
         .first::<Author>(&mut conn)
         .await
-        .map_err(|err| {
-            if let ResultError::NotFound = err {
-                Status::NotFound
-            } else {
-                Status::InternalServerError
-            }
-        })?;
+        .map_err(result_error_to_status)?;
 
     delete(schema::authors::table.filter(schema::authors::id.eq(id)))
         .execute(&mut conn)

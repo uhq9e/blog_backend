@@ -2,10 +2,7 @@
 
 use crate::schema::*;
 use crate::utils::{datetime_format, naive_date_format};
-use diesel::dsl::*;
-use diesel::backend::Backend;
 use diesel::prelude::*;
-use diesel::query_dsl::methods::SelectDsl;
 use serde::{Deserialize, Serialize};
 
 use chrono::{DateTime, NaiveDate, Utc};
