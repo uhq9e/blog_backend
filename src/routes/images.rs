@@ -6,8 +6,8 @@ use crate::{
     schema,
     utils::{
         naive_date_format, naive_date_format_option, response::*, result_error_to_status,
-        result_error_to_status_failed_dependency, sdk_error_to_status, transaction_error_to_status,
-        ApiTokenClaims, Pagination, TransactionError,
+        result_error_to_status_failed_dependency, sdk_error_to_status, ApiTokenClaims, Pagination,
+        TransactionError,
     },
 };
 use aws_sdk_s3::operation::put_object::PutObjectError;
@@ -36,25 +36,28 @@ async fn list_image_items(
     date: Option<String>,
     author_id: Option<i32>,
     pg: Pagination,
-) -> Result<Json<Vec<ImageItemFull>>, Status> {
+) -> Result<Json<ListResponse<ImageItemFull>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
     let mut query = schema::image_items::table
         .left_join(schema::authors::table)
         .into_boxed();
+    let mut query_count = schema::image_items::table.into_boxed();
 
     if let Some(val) = date {
         let date = NaiveDate::parse_from_str(val.as_str(), "%Y-%m-%d")
             .map_err(|_| Status::UnprocessableEntity)?;
         query = query.filter(schema::image_items::date.eq(date));
-    }
+        query_count = query_count.filter(schema::image_items::date.eq(date));
+    };
     if let Some(val) = author_id {
         query = query.filter(schema::image_items::author_id.eq(val));
-    }
+        query_count = query_count.filter(schema::image_items::author_id.eq(val));
+    };
 
     let items_batch: Vec<(ImageItem, Option<Author>)> = query
-        .offset(pg.offset.into())
-        .limit(pg.limit.into())
+        .offset(pg.offset)
+        .limit(pg.limit)
         .load::<(ImageItem, Option<Author>)>(&mut conn)
         .await
         .map_err(|_| Status::InternalServerError)?;
@@ -90,7 +93,13 @@ async fn list_image_items(
         })
         .collect();
 
-    Ok(Json(results))
+    let count = query_count
+        .count()
+        .get_result(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(ListResponse::new(results).count(count)))
 }
 
 #[get("/item/<id>")]

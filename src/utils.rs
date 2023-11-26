@@ -12,10 +12,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(FromForm, Debug)]
 pub struct Pagination {
-    #[field(default = 0)]
-    pub offset: u32,
-    #[field(default = 20, validate = range(..100))]
-    pub limit: u32,
+    #[field(default = 0, validate = range(0..))]
+    pub offset: i64,
+    #[field(default = 20, validate = range(0..100))]
+    pub limit: i64,
 }
 
 #[derive(Debug)]
@@ -105,19 +105,39 @@ impl<'r> FromRequest<'r> for ApiTokenClaims {
 pub mod response {
     use serde::Serialize;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug, Clone)]
     pub struct InsertResponse<T> {
         pub id: T,
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug, Clone)]
     pub struct UpdateResponse<T> {
         pub id: T,
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug, Clone)]
     pub struct DeleteResponse<T> {
         pub id: T,
+    }
+
+    #[derive(Serialize, Debug, Clone)]
+    pub struct ListResponse<T> {
+        pub items: Vec<T>,
+        pub count: Option<i64>,
+    }
+
+    impl<T> ListResponse<T> {
+        pub fn new(items: Vec<T>) -> Self {
+            Self {
+                items,
+                count: None,
+            }
+        }
+
+        pub fn count(mut self, count: i64) -> Self {
+            self.count = Some(count);
+            self
+        }
     }
 }
 

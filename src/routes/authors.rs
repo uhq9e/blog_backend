@@ -13,17 +13,39 @@ use diesel::{
 };
 use diesel_async::RunQueryDsl;
 
-#[get("/item?<pg..>")]
-async fn list_authors(db: &State<db::Pool>, pg: Pagination) -> Result<Json<Vec<Author>>, Status> {
+#[get("/item?<name>&<pg..>")]
+async fn list_authors(
+    db: &State<db::Pool>,
+    name: Option<String>,
+    pg: Pagination,
+) -> Result<Json<ListResponse<Author>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
-    let authors = schema::authors::table
+
+    let mut query = schema::authors::table.into_boxed();
+    let mut query_count = schema::authors::table.into_boxed();
+
+    if let Some(name) = name {
+        query = query.filter(schema::authors::name.eq(name.to_owned()));
+        query_count = query_count.filter(schema::authors::name.eq(name.to_owned()));
+    };
+
+    let authors = query
         .offset(pg.offset.into())
         .limit(pg.limit.into())
-        .load::<Author>(&mut conn)
+        .load(&mut conn)
         .await
         .map_err(|_| Status::InternalServerError)?;
 
-    Ok(Json(authors))
+    let count = query_count
+        .count()
+        .get_result(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(
+        ListResponse::new(authors)
+            .count(count)
+    ))
 }
 
 #[get("/item/<id>")]
