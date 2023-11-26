@@ -30,14 +30,6 @@ pub enum TransactionError<T> {
     SdkError(SdkError<T, Response<SdkBody>>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ApiTokenClaims {
-    pub iat: i64,
-    pub exp: i64,
-    pub iss: String,
-    pub admin: bool,
-}
-
 pub fn sdk_error_to_status<T>(err: SdkError<T, Response<SdkBody>>) -> Status {
     if let SdkError::ServiceError(_) = err {
         Status::FailedDependency
@@ -67,6 +59,14 @@ pub fn transaction_error_to_status<T>(err: TransactionError<T>) -> Status {
         TransactionError::SdkError(err) => sdk_error_to_status(err),
         TransactionError::ResultError(err) => result_error_to_status(err),
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiTokenClaims {
+    pub iat: i64,
+    pub exp: i64,
+    pub iss: String,
+    pub admin: bool,
 }
 
 #[rocket::async_trait]
@@ -128,10 +128,7 @@ pub mod response {
 
     impl<T> ListResponse<T> {
         pub fn new(items: Vec<T>) -> Self {
-            Self {
-                items,
-                count: None,
-            }
+            Self { items, count: None }
         }
 
         pub fn count(mut self, count: i64) -> Self {

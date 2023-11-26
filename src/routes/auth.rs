@@ -3,11 +3,12 @@ use crate::{
     AppState,
 };
 use chrono;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use rocket::{http::Status, post, Route, State};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use regex::Regex;
+use rocket::{get, http::Status, post, Route, State};
 
 #[post("/create_token")]
-pub fn create_token(
+fn create_token(
     state: &State<AppState>,
     auth: Result<ApiTokenClaims, ApiTokenError>,
 ) -> Result<String, Status> {
@@ -38,6 +39,25 @@ pub fn create_token(
     }
 }
 
+#[post("/validate_token", data = "<token>")]
+fn validate_token(state: &State<AppState>, token: &'_ str) -> Status {
+    let re = Regex::new(r"^Bearer (?P<token>\S+)$").unwrap();
+
+    if let Some(caps) = re.captures(token) {
+        if let Ok(_) = decode::<ApiTokenClaims>(
+            &caps["token"],
+            &DecodingKey::from_secret(state.jwt_signing_key.as_ref()),
+            &Validation::new(Algorithm::HS512),
+        ) {
+            Status::Ok
+        } else {
+            Status::Forbidden
+        }
+    } else {
+        Status::Forbidden
+    }
+}
+
 pub fn routes() -> Vec<Route> {
-    routes![create_token]
+    routes![create_token, validate_token]
 }
