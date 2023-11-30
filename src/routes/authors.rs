@@ -25,9 +25,8 @@ async fn list_authors(
     let mut query_count = schema::authors::table.into_boxed();
 
     if let Some(name) = name {
-        let name_like = format!("%{}%", name);
-        query = query.filter(schema::authors::name.like(name_like.to_owned()));
-        query_count = query_count.filter(schema::authors::name.like(name_like.to_owned()));
+        query = query.filter(schema::authors::name.like(name.to_owned()));
+        query_count = query_count.filter(schema::authors::name.like(name.to_owned()));
     };
 
     let authors = query
