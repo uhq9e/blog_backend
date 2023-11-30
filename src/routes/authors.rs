@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use diesel::{
     delete, insert_into, prelude::Insertable, query_builder::AsChangeset, update,
-    ExpressionMethods, QueryDsl,
+    ExpressionMethods, QueryDsl, TextExpressionMethods,
 };
 use diesel_async::RunQueryDsl;
 
@@ -25,8 +25,9 @@ async fn list_authors(
     let mut query_count = schema::authors::table.into_boxed();
 
     if let Some(name) = name {
-        query = query.filter(schema::authors::name.eq(name.to_owned()));
-        query_count = query_count.filter(schema::authors::name.eq(name.to_owned()));
+        let name_like = format!("%{}%", name);
+        query = query.filter(schema::authors::name.like(name_like.to_owned()));
+        query_count = query_count.filter(schema::authors::name.like(name_like.to_owned()));
     };
 
     let authors = query
