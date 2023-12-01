@@ -42,10 +42,25 @@ async fn list_authors(
         .await
         .map_err(|_| Status::InternalServerError)?;
 
-    Ok(Json(
-        ListResponse::new(authors)
-            .count(count)
-    ))
+    Ok(Json(ListResponse::new(authors).count(count)))
+}
+
+#[get("/all")]
+async fn all_author(db: &State<db::Pool>) -> Result<Json<ListResponse<Author>>, Status> {
+    let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
+
+    let authors = schema::authors::table
+        .load(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let count = schema::authors::table
+        .count()
+        .get_result(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(ListResponse::new(authors).count(count)))
 }
 
 #[get("/item/<id>")]
@@ -159,6 +174,7 @@ async fn delete_author(
 pub fn routes() -> Vec<Route> {
     routes![
         list_authors,
+        all_author,
         get_author,
         create_author,
         update_author,
