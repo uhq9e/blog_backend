@@ -3,10 +3,13 @@ extern crate diesel;
 #[macro_use]
 extern crate rocket;
 
-use dotenvy::dotenv;
-use std::env;
-use aws_config::{self, BehaviorVersion, Region, environment::credentials::EnvironmentVariableCredentialsProvider};
+use aws_config::{
+    self, environment::credentials::EnvironmentVariableCredentialsProvider, BehaviorVersion, Region,
+};
 use aws_sdk_s3;
+use dotenvy::dotenv;
+use rocket::data::ToByteUnit;
+use std::env;
 
 mod db;
 mod models;
@@ -31,7 +34,8 @@ async fn rocket() -> _ {
         .credentials_provider(EnvironmentVariableCredentialsProvider::new())
         .endpoint_url(env::var("S3_ENDPOINT_URL").expect("未设置S3_ENDPOINT_URL"))
         .region(Region::new("auto"))
-        .load().await;
+        .load()
+        .await;
 
     let client = aws_sdk_s3::Client::new(&config);
 
@@ -43,8 +47,13 @@ async fn rocket() -> _ {
 
     let pool = db::establish_connection(app_state.database_url.to_owned()).await;
 
+    let limits = rocket::data::Limits::default()
+        .limit("file", 20.megabytes())
+        .limit("data-form", 30.megabytes());
+
     let config = rocket::Config {
         port: 6223,
+        limits,
         ..rocket::Config::default()
     };
 
