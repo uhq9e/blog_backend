@@ -65,6 +65,13 @@ async fn list_image_items(
         query_count = query_count.filter(schema::image_items::author_id.eq(val));
     };
 
+    // 顺序选择
+    if pg.order >= 0 {
+        query = query.order(schema::image_items::id.asc());
+    } else {
+        query = query.order(schema::image_items::id.desc());
+    }
+
     let items_batch: Vec<(ImageItem, Option<Author>)> = query
         .offset(pg.offset)
         .limit(pg.limit)

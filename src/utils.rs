@@ -14,8 +14,10 @@ use serde::{Deserialize, Serialize};
 pub struct Pagination {
     #[field(default = 0, validate = range(0..))]
     pub offset: i64,
-    #[field(default = 20, validate = range(0..100))]
+    #[field(default = 20, validate = range(0..101))]
     pub limit: i64,
+    #[field(default = 1, validate = range(-1..2))]
+    pub order: i8,
 }
 
 #[derive(Debug)]

@@ -37,6 +37,13 @@ async fn list_authors(
         query_count = query_count.filter(schema::authors::name.like(name.to_owned()));
     };
 
+    // 顺序选择
+    if pg.order >= 0 {
+        query = query.order(schema::authors::id.asc());
+    } else {
+        query = query.order(schema::authors::id.desc());
+    }
+
     let authors = query
         .offset(pg.offset.into())
         .limit(pg.limit.into())
