@@ -13,9 +13,10 @@ use diesel::{
 };
 use diesel_async::RunQueryDsl;
 
-#[get("/item?<name>&<pg..>")]
+#[get("/item?<id>&<name>&<pg..>")]
 async fn list_authors(
     db: &State<db::Pool>,
+    id: Option<i32>,
     name: Option<String>,
     pg: Pagination,
 ) -> Result<Json<ListResponse<Author>>, Status> {
@@ -24,6 +25,13 @@ async fn list_authors(
     let mut query = schema::authors::table.into_boxed();
     let mut query_count = schema::authors::table.into_boxed();
 
+    // 以id筛选
+    if let Some(val) = id {
+        query = query.filter(schema::authors::id.eq(val));
+        query_count = query_count.filter(schema::authors::id.eq(val));
+    }
+
+    // 以name筛选
     if let Some(name) = name {
         query = query.filter(schema::authors::name.like(name.to_owned()));
         query_count = query_count.filter(schema::authors::name.like(name.to_owned()));

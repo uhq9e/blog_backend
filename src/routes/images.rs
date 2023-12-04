@@ -30,9 +30,10 @@ struct ImageItemFull {
     local_files: Vec<LocalFile>,
 }
 
-#[get("/item?<date>&<author_id>&<pg..>")]
+#[get("/item?<id>&<date>&<author_id>&<pg..>")]
 async fn list_image_items(
     db: &State<db::Pool>,
+    id: Option<i32>,
     date: Option<String>,
     author_id: Option<i32>,
     pg: Pagination,
@@ -44,12 +45,21 @@ async fn list_image_items(
         .into_boxed();
     let mut query_count = schema::image_items::table.into_boxed();
 
+    // 以id筛选
+    if let Some(val) = id {
+        query = query.filter(schema::image_items::id.eq(val));
+        query_count = query_count.filter(schema::image_items::id.eq(val));
+    }
+
+    // 以date筛选
     if let Some(val) = date {
         let date = NaiveDate::parse_from_str(val.as_str(), "%Y-%m-%d")
             .map_err(|_| Status::UnprocessableEntity)?;
         query = query.filter(schema::image_items::date.eq(date));
         query_count = query_count.filter(schema::image_items::date.eq(date));
     };
+
+    // 以author_id筛选
     if let Some(val) = author_id {
         query = query.filter(schema::image_items::author_id.eq(val));
         query_count = query_count.filter(schema::image_items::author_id.eq(val));
