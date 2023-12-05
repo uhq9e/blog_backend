@@ -60,19 +60,11 @@ pub struct ImageItem {
     pub urls: Option<Vec<Option<String>>>,
     #[serde(with = "naive_date_format")]
     pub date: NaiveDate,
+    pub nsfw: bool,
     pub author_id: Option<i32>,
 }
 
-#[derive(
-    Queryable,
-    Selectable,
-    Insertable,
-    Debug,
-    Clone,
-    Identifiable,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Serialize, Deserialize)]
 pub struct LocalFile {
     pub id: String,
     pub file_name: Option<String>,

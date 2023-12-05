@@ -30,12 +30,13 @@ struct ImageItemFull {
     local_files: Vec<LocalFile>,
 }
 
-#[get("/item?<id>&<date>&<author_id>&<pg..>")]
+#[get("/item?<id>&<date>&<author_id>&<nsfw>&<pg..>")]
 async fn list_image_items(
     db: &State<db::Pool>,
     id: Option<i32>,
     date: Option<String>,
     author_id: Option<i32>,
+    nsfw: Option<bool>,
     pg: Pagination,
 ) -> Result<Json<ListResponse<ImageItemFull>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
@@ -63,6 +64,12 @@ async fn list_image_items(
     if let Some(val) = author_id {
         query = query.filter(schema::image_items::author_id.eq(val));
         query_count = query_count.filter(schema::image_items::author_id.eq(val));
+    };
+
+    // 以nsfw筛选
+    if let Some(val) = nsfw {
+        query = query.filter(schema::image_items::nsfw.eq(val));
+        query_count = query_count.filter(schema::image_items::nsfw.eq(val));
     };
 
     // 顺序选择

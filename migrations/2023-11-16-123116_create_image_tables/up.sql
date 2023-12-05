@@ -8,6 +8,7 @@ CREATE TABLE image_items (
     id SERIAL4 PRIMARY KEY,
     urls TEXT[] NULL,
     "date" date NOT NULL DEFAULT CURRENT_DATE,
+    nsfw boolean NOT NULL DEFAULT false,
     author_id INT4 NULL REFERENCES authors(id) ON DELETE SET NULL
 );
 

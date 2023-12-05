@@ -29,6 +29,7 @@ diesel::table! {
         id -> Int4,
         urls -> Nullable<Array<Nullable<Text>>>,
         date -> Date,
+        nsfw -> Bool,
         author_id -> Nullable<Int4>,
     }
 }
