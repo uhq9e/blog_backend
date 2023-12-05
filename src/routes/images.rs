@@ -164,6 +164,7 @@ struct NewImageItemForm {
     urls: Vec<String>,
     #[serde(with = "naive_date_format")]
     date: NaiveDate,
+    nsfw: bool,
 }
 
 #[post("/item", data = "<data>")]
@@ -183,6 +184,7 @@ async fn create_image_item(
                         schema::image_items::author_id.eq(data.author_id),
                         schema::image_items::urls.eq(&data.urls),
                         schema::image_items::date.eq(data.date),
+                        schema::image_items::nsfw.eq(data.nsfw),
                     ))
                     .returning(schema::image_items::id)
                     .get_result::<i32>(conn)
@@ -227,6 +229,7 @@ struct UpdateImageItemForm {
     urls: Option<Vec<String>>,
     #[serde(with = "naive_date_format_option", default)]
     date: Option<NaiveDate>,
+    nsfw: Option<bool>,
     author_id: Option<i32>,
 }
 
@@ -235,6 +238,7 @@ struct UpdateImageItemForm {
 struct ImageItemForUpdate {
     urls: Option<Vec<String>>,
     date: Option<NaiveDate>,
+    nsfw: Option<bool>,
     author_id: Option<i32>,
 }
 
@@ -243,6 +247,7 @@ impl From<UpdateImageItemForm> for ImageItemForUpdate {
         Self {
             urls: value.urls,
             date: value.date,
+            nsfw: value.nsfw,
             author_id: value.author_id,
         }
     }
