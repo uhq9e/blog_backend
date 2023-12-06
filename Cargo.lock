@@ -599,6 +599,7 @@ dependencies = [
  "chrono",
  "diesel 2.1.4",
  "diesel-async",
+ "diesel-order-with-direction",
  "dotenvy",
  "itertools",
  "jsonwebtoken",
@@ -857,6 +858,15 @@ dependencies = [
  "scoped-futures",
  "tokio",
  "tokio-postgres",
+]
+
+[[package]]
+name = "diesel-order-with-direction"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d934dc87db36d8e5f1b661a4605635b2550b0c35aa336bed3588ecd1e842212b"
+dependencies = [
+ "diesel 2.1.4",
 ]
 
 [[package]]

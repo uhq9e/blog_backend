@@ -2,7 +2,9 @@
 
 use crate::schema::*;
 use crate::utils::{datetime_format, naive_date_format};
+use diesel::pg::Pg;
 use diesel::prelude::*;
+use diesel::query_builder::QueryFragment;
 use serde::{Deserialize, Serialize};
 
 use chrono::{DateTime, NaiveDate, Utc};

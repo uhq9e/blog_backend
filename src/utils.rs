@@ -1,6 +1,7 @@
 use crate::AppState;
 use aws_sdk_s3::{error::SdkError, primitives::SdkBody};
 use aws_smithy_runtime_api::http::Response;
+use diesel_order_with_direction::QueryOrderDirection;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use regex::Regex;
 use rocket::{
@@ -18,6 +19,8 @@ pub struct Pagination {
     pub limit: i64,
     #[field(default = 1, validate = range(-1..2))]
     pub order: i8,
+    #[field(default = "+id")]
+    pub order_by: String,
 }
 
 #[derive(Debug)]
@@ -102,6 +105,33 @@ impl<'r> FromRequest<'r> for ApiTokenClaims {
             Outcome::Error((Status::Ok, ApiTokenError::MissingHeader))
         }
     }
+}
+
+pub struct ParsedOrderBy {
+    pub column: String,
+    pub direction: QueryOrderDirection,
+}
+
+pub fn parse_order_from_string(str: String) -> Vec<Option<ParsedOrderBy>> {
+    let re = Regex::new(r"^(?P<dir>[+-]?)(?P<column>\w{1,25})$").unwrap();
+
+    let mut parsed_items: Vec<Option<ParsedOrderBy>> = Vec::new();
+    for str in str.split(",").map(|v| v.trim()) {
+        parsed_items.push(if let Some(cap) = re.captures(str) {
+            Some(ParsedOrderBy {
+                column: cap["column"].to_string(),
+                direction: match &cap["dir"] {
+                    "+" => QueryOrderDirection::Ascending,
+                    "-" => QueryOrderDirection::Descending,
+                    _ => QueryOrderDirection::Ascending,
+                },
+            })
+        } else {
+            None
+        })
+    }
+
+    parsed_items
 }
 
 pub mod response {

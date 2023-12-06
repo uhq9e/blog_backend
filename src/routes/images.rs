@@ -5,13 +5,14 @@ use crate::{
     models::*,
     schema,
     utils::{
-        naive_date_format, naive_date_format_option, response::*, result_error_to_status,
-        result_error_to_status_failed_dependency, sdk_error_to_status, ApiTokenClaims, Pagination,
-        TransactionError,
+        naive_date_format, naive_date_format_option, parse_order_from_string, response::*,
+        result_error_to_status, result_error_to_status_failed_dependency, sdk_error_to_status,
+        ApiTokenClaims, Pagination, TransactionError,
     },
 };
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use chrono::NaiveDate;
+use diesel_order_with_direction::OrderWithDirectionDsl;
 use itertools::izip;
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, Route, State};
 use serde::{Deserialize, Serialize};
@@ -73,10 +74,18 @@ async fn list_image_items(
     };
 
     // 顺序选择
-    if pg.order >= 0 {
-        query = query.order(schema::image_items::id.asc());
-    } else {
-        query = query.order(schema::image_items::id.desc());
+    for orders in parse_order_from_string(pg.order_by) {
+        if let Some(order) = orders {
+            query = match order.column.as_str() {
+                "id" => query.then_order_by_with_dir(order.direction, schema::image_items::id),
+                "date" => query.then_order_by_with_dir(order.direction, schema::image_items::date),
+                "nsfw" => query.then_order_by_with_dir(order.direction, schema::image_items::nsfw),
+                "author_id" => {
+                    query.then_order_by_with_dir(order.direction, schema::image_items::author_id)
+                }
+                _ => query,
+            }
+        }
     }
 
     let items_batch: Vec<(ImageItem, Option<Author>)> = query

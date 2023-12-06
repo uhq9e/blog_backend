@@ -2,8 +2,11 @@ use crate::{
     db,
     models::*,
     schema,
-    utils::{response::*, result_error_to_status, ApiTokenClaims, Pagination},
+    utils::{
+        parse_order_from_string, response::*, result_error_to_status, ApiTokenClaims, Pagination,
+    },
 };
+use diesel_order_with_direction::OrderWithDirectionDsl;
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, Route, State};
 use serde::Deserialize;
 
@@ -38,10 +41,14 @@ async fn list_authors(
     };
 
     // 顺序选择
-    if pg.order >= 0 {
-        query = query.order(schema::authors::id.asc());
-    } else {
-        query = query.order(schema::authors::id.desc());
+    for orders in parse_order_from_string(pg.order_by) {
+        if let Some(order) = orders {
+            query = match order.column.as_str() {
+                "id" => query.then_order_by_with_dir(order.direction, schema::authors::id),
+                "name" => query.then_order_by_with_dir(order.direction, schema::authors::name),
+                _ => query,
+            }
+        }
     }
 
     let authors = query
