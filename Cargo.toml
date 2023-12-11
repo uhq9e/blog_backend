@@ -22,8 +22,10 @@ jsonwebtoken = "9.1.0"
 md5 = "0.7.0"
 r2d2 = "0.8.10"
 regex = "1.10.2"
+reqwest = { version = "0.11.22", features = ["json", "gzip", "brotli"] }
 rocket = { version = "0.5.0", features = ["json"] }
 serde = { version = "1.0.192", features = ["derive"] }
+tokio = { version = "1.35.0", features = ["full"] }
 uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
 
 [profile.release]

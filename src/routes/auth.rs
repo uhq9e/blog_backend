@@ -5,7 +5,7 @@ use crate::{
 use chrono;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use regex::Regex;
-use rocket::{get, http::Status, post, Route, State};
+use rocket::{http::Status, post, Route, State};
 
 #[post("/create_token")]
 fn create_token(

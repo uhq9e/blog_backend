@@ -35,7 +35,7 @@ impl<T> From<diesel::result::Error> for TransactionError<T> {
     }
 }
 
-#[post("/item", data = "<file>")]
+#[post("/image/item", data = "<file>")]
 async fn create_object(
     app_state: &State<AppState>,
     auth: Option<ApiTokenClaims>,
@@ -45,11 +45,11 @@ async fn create_object(
     auth.ok_or(Status::Forbidden)?;
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
-    let mut data_stream = file.open().await.map_err(|_| Status::InternalServerError)?;
+    let mut data_stream = file.open().await.map_err(|_| Status::BadRequest)?;
     let mut data_vec: Vec<u8> = vec![];
     io::copy(&mut data_stream, &mut data_vec)
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|_| Status::BadRequest)?;
 
     let digest = md5::compute(&data_vec);
     let md5 = format!("{:x}", digest);
@@ -66,12 +66,15 @@ async fn create_object(
         }));
     }
 
-    let filename = if let Some(content_type) = file.content_type() {
-        if let Some(ext) = content_type.extension() {
-            format!("{}.{}", md5, ext.as_str())
-        } else {
-            md5.to_owned()
-        }
+    let binary = ContentType::Binary;
+    let content_type = file.content_type().or(Some(&binary)).unwrap();
+
+    if content_type.top().ne("image") && content_type.ne(&ContentType::Binary) {
+        return Err(Status::UnprocessableEntity);
+    };
+
+    let filename = if let Some(ext) = content_type.extension() {
+        format!("{}.{}", md5, ext.as_str())
     } else {
         md5.to_owned()
     };
@@ -102,6 +105,98 @@ async fn create_object(
                 .s3_client
                 .put_object()
                 .body(ByteStream::from(data_vec))
+                .bucket(BUCKET)
+                .content_type(content_type.to_string())
+                .content_length(length as i64)
+                .key(&key)
+                .send()
+                .await
+                .map_err(|err| TransactionError::SdkError(err))?;
+
+            Ok(())
+        }
+        .scope_boxed()
+    })
+    .await
+    .map_err(transaction_error_to_status)?;
+
+    Ok(Json(InsertResponse { id: md5_ }))
+}
+
+#[post("/image/item_from_web", data = "<url>")]
+async fn create_object_from_web(
+    app_state: &State<AppState>,
+    auth: Option<ApiTokenClaims>,
+    db: &State<db::Pool>,
+    url: String,
+) -> Result<Json<InsertResponse<String>>, Status> {
+    auth.ok_or(Status::Forbidden)?;
+    let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
+
+    let client = reqwest::Client::new();
+
+    let resp_head = client
+        .head(&url)
+        .send()
+        .await
+        .map_err(|_| Status::BadRequest)?
+        .error_for_status()
+        .map_err(|_| Status::BadRequest)?;
+
+    let content_type_str = if let Some(v) = resp_head.headers().get("content-type") {
+        v.to_str().map_or("application/octet-stream", |v| v)
+    } else {
+        "application/octet-stream"
+    };
+
+    let content_type = ContentType::parse_flexible(content_type_str)
+        .or(Some(ContentType::Binary))
+        .unwrap();
+
+    if content_type.top().ne("image") && content_type.ne(&ContentType::Binary) {
+        return Err(Status::UnprocessableEntity);
+    };
+
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|_| Status::BadRequest)?
+        .error_for_status()
+        .map_err(|_| Status::BadRequest)?;
+
+    let resp_data = resp.bytes().await.map_err(|_| Status::BadRequest)?;
+
+    let digest = md5::compute(&resp_data);
+    let md5 = format!("{:x}", digest);
+
+    let filename = if let Some(ext) = content_type.extension() {
+        format!("{}.{}", md5, ext.as_str())
+    } else {
+        md5.to_owned()
+    };
+
+    let key = format!("{}{}", IMAGE_PREFIX, filename);
+
+    let md5_ = md5.to_owned();
+
+    conn.transaction::<(), TransactionError<PutObjectError>, _>(|conn| {
+        let length = resp_data.len();
+        async move {
+            insert_into(schema::local_files::table)
+                .values((
+                    schema::local_files::id.eq(md5),
+                    schema::local_files::file_name.eq(&filename),
+                    schema::local_files::path.eq(&key),
+                ))
+                .execute(conn)
+                .await
+                .map_err(|err| TransactionError::ResultError(err))?;
+
+            app_state
+                .s3_client
+                .put_object()
+                .body(ByteStream::from(resp_data))
                 .bucket(BUCKET)
                 .content_type(content_type.to_string())
                 .content_length(length as i64)
@@ -179,5 +274,10 @@ async fn delete_object(
 }
 
 pub fn routes() -> Vec<Route> {
-    routes![create_object, get_object, delete_object]
+    routes![
+        create_object,
+        create_object_from_web,
+        get_object,
+        delete_object
+    ]
 }
