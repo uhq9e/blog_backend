@@ -7,7 +7,7 @@ use crate::{
     utils::{
         naive_date_format, naive_date_format_option, parse_order_from_string, response::*,
         result_error_to_status, result_error_to_status_failed_dependency, sdk_error_to_status,
-        ApiTokenClaims, Pagination, TransactionError,
+        ApiTokenClaims, PaginationHighLimit, TransactionError,
     },
 };
 use aws_sdk_s3::operation::put_object::PutObjectError;
@@ -38,7 +38,7 @@ async fn list_image_items(
     date: Option<String>,
     author_id: Option<i32>,
     nsfw: Option<bool>,
-    pg: Pagination,
+    pg: PaginationHighLimit,
 ) -> Result<Json<ListResponse<ImageItemFull>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 

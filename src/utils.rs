@@ -23,6 +23,18 @@ pub struct Pagination {
     pub order_by: String,
 }
 
+#[derive(FromForm, Debug)]
+pub struct PaginationHighLimit {
+    #[field(default = 0, validate = range(0..))]
+    pub offset: i64,
+    #[field(default = 1000, validate = range(0..1001))]
+    pub limit: i64,
+    #[field(default = 1, validate = range(-1..2))]
+    pub order: i8,
+    #[field(default = "+id")]
+    pub order_by: String,
+}
+
 #[derive(Debug)]
 pub enum ApiTokenError {
     MissingHeader,
