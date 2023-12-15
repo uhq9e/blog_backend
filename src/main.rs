@@ -8,6 +8,8 @@ use aws_config::{
 };
 use aws_sdk_s3;
 use dotenvy::dotenv;
+use env_logger;
+use log::info;
 use rocket::data::ToByteUnit;
 use std::env;
 
@@ -41,6 +43,8 @@ pub async fn create_s3_client() -> aws_sdk_s3::Client {
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
     dotenv().ok();
+
+    env_logger::init();
 
     let client = create_s3_client().await;
 

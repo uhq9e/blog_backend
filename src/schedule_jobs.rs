@@ -6,9 +6,10 @@ use crate::{
     BUCKET,
 };
 use aws_sdk_s3::operation::delete_object::DeleteObjectError;
+use clokwerk::{AsyncScheduler, Job, TimeUnits};
 use diesel::{ExpressionMethods, QueryDsl, SelectableHelper};
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
-use clokwerk::{AsyncScheduler, Job, TimeUnits};
+use log::info;
 use std::time::Duration;
 
 pub async fn init(db_url: String) -> () {
@@ -72,4 +73,6 @@ pub async fn init(db_url: String) -> () {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     });
+
+    info!("Schedule jobs started");
 }

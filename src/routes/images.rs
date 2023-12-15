@@ -22,6 +22,7 @@ use diesel::{
     ExpressionMethods, GroupedBy, QueryDsl, SelectableHelper,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use log::info;
 
 #[derive(Serialize)]
 struct ImageItemFull {
@@ -229,6 +230,8 @@ async fn create_image_item(
             TransactionError::ResultError(err) => result_error_to_status_failed_dependency(err),
         })?;
 
+    info!("Create image item: {}", image_item_id);
+
     Ok(Json(InsertResponse { id: image_item_id }))
 }
 
@@ -335,6 +338,8 @@ async fn update_image_item(
         }
     })?;
 
+    info!("Update image item: {}", id);
+
     Ok(Json(UpdateResponse { id }))
 }
 
@@ -357,6 +362,8 @@ async fn delete_image_item(
         .execute(&mut conn)
         .await
         .map_err(|_| Status::InternalServerError)?;
+
+    info!("Delete image item: {}", id);
 
     Ok(Json(DeleteResponse { id }))
 }

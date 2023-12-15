@@ -7,6 +7,7 @@ use crate::{
     },
 };
 use diesel_order_with_direction::OrderWithDirectionDsl;
+use log::info;
 use rocket::{delete, get, http::Status, post, put, serde::json::Json, Route, State};
 use serde::Deserialize;
 
@@ -126,6 +127,8 @@ async fn create_author(
         .await
         .map_err(|_| Status::InternalServerError)?;
 
+    info!("Author created: {}", author_id);
+
     Ok(Json(InsertResponse { id: author_id }))
 }
 
@@ -167,6 +170,8 @@ async fn update_author(
             .map_err(|_| Status::InternalServerError)?;
     };
 
+    info!("Author updated: {}", id);
+
     Ok(Json(UpdateResponse { id }))
 }
 
@@ -189,6 +194,8 @@ async fn delete_author(
         .execute(&mut conn)
         .await
         .map_err(|_| Status::InternalServerError)?;
+
+    info!("Author deleted: {}", id);
 
     Ok(Json(DeleteResponse { id }))
 }

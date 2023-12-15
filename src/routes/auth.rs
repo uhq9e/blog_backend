@@ -4,6 +4,7 @@ use crate::{
 };
 use chrono;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use log::info;
 use regex::Regex;
 use rocket::{http::Status, post, Route, State};
 

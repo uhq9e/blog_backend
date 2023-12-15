@@ -1,9 +1,14 @@
+use std::io::Cursor;
+
 use aws_sdk_s3::{
     operation::{delete_object::DeleteObjectError, put_object::PutObjectError},
     primitives::ByteStream,
 };
 use diesel::{delete, insert_into, ExpressionMethods, QueryDsl};
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
+use image::io::Reader as ImageReader;
+use image::ImageOutputFormat;
+use log::info;
 use md5;
 use rocket::{
     delete,
@@ -45,14 +50,32 @@ async fn create_object(
     auth.ok_or(Status::Forbidden)?;
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
+    let binary = ContentType::Binary;
+    let content_type = file.content_type().or(Some(&binary)).unwrap();
+
+    if content_type.top().ne("image") {
+        return Err(Status::UnprocessableEntity);
+    };
+
     let mut data_stream = file.open().await.map_err(|_| Status::BadRequest)?;
     let mut data_vec: Vec<u8> = vec![];
     io::copy(&mut data_stream, &mut data_vec)
         .await
         .map_err(|_| Status::BadRequest)?;
 
-    let digest = md5::compute(&data_vec);
+    let mut new_data_vec: Vec<u8> = Vec::new();
+    ImageReader::new(Cursor::new(data_vec))
+        .with_guessed_format()
+        .map_err(|_| Status::InternalServerError)?
+        .decode()
+        .map_err(|_| Status::BadRequest)?
+        .write_to(&mut Cursor::new(&mut new_data_vec), ImageOutputFormat::WebP)
+        .map_err(|_| Status::InternalServerError)?;
+
+    let digest = md5::compute(&new_data_vec);
     let md5 = format!("{:x}", digest);
+
+    let new_content_type = ContentType::WEBP;
 
     let objs = schema::local_files::table
         .find(&md5)
@@ -66,14 +89,7 @@ async fn create_object(
         }));
     }
 
-    let binary = ContentType::Binary;
-    let content_type = file.content_type().or(Some(&binary)).unwrap();
-
-    if content_type.top().ne("image") && content_type.ne(&ContentType::Binary) {
-        return Err(Status::UnprocessableEntity);
-    };
-
-    let filename = if let Some(ext) = content_type.extension() {
+    let filename = if let Some(ext) = new_content_type.extension() {
         format!("{}.{}", md5, ext.as_str())
     } else {
         md5.to_owned()
@@ -84,11 +100,14 @@ async fn create_object(
     let md5_ = md5.to_owned();
 
     conn.transaction::<(), TransactionError<PutObjectError>, _>(|conn| {
+        /*
         let content_type = file
             .content_type()
             .or(Some(&ContentType::Binary))
             .unwrap()
             .to_owned();
+        */
+        let new_content_type = ContentType::WEBP;
         let length = file.len().to_owned();
         async move {
             insert_into(schema::local_files::table)
@@ -104,9 +123,9 @@ async fn create_object(
             app_state
                 .s3_client
                 .put_object()
-                .body(ByteStream::from(data_vec))
+                .body(ByteStream::from(new_data_vec))
                 .bucket(BUCKET)
-                .content_type(content_type.to_string())
+                .content_type(new_content_type.to_string())
                 .content_length(length as i64)
                 .key(&key)
                 .send()
@@ -119,6 +138,8 @@ async fn create_object(
     })
     .await
     .map_err(transaction_error_to_status)?;
+
+    info!("Object created: {}", md5_);
 
     Ok(Json(InsertResponse { id: md5_ }))
 }
@@ -153,7 +174,7 @@ async fn create_object_from_web(
         .or(Some(ContentType::Binary))
         .unwrap();
 
-    if content_type.top().ne("image") && content_type.ne(&ContentType::Binary) {
+    if content_type.top().ne("image") {
         return Err(Status::UnprocessableEntity);
     };
 
@@ -167,10 +188,33 @@ async fn create_object_from_web(
 
     let resp_data = resp.bytes().await.map_err(|_| Status::BadRequest)?;
 
-    let digest = md5::compute(&resp_data);
+    let mut new_data_vec: Vec<u8> = Vec::new();
+    ImageReader::new(Cursor::new(resp_data))
+        .with_guessed_format()
+        .map_err(|_| Status::InternalServerError)?
+        .decode()
+        .map_err(|_| Status::BadRequest)?
+        .write_to(&mut Cursor::new(&mut new_data_vec), ImageOutputFormat::WebP)
+        .map_err(|_| Status::InternalServerError)?;
+
+    let digest = md5::compute(&new_data_vec);
     let md5 = format!("{:x}", digest);
 
-    let filename = if let Some(ext) = content_type.extension() {
+    let new_content_type = ContentType::WEBP;
+
+    let objs = schema::local_files::table
+        .find(&md5)
+        .load::<LocalFile>(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    if !objs.is_empty() {
+        return Ok(Json(InsertResponse {
+            id: objs[0].id.to_owned(),
+        }));
+    }
+
+    let filename = if let Some(ext) = new_content_type.extension() {
         format!("{}.{}", md5, ext.as_str())
     } else {
         md5.to_owned()
@@ -181,7 +225,7 @@ async fn create_object_from_web(
     let md5_ = md5.to_owned();
 
     conn.transaction::<(), TransactionError<PutObjectError>, _>(|conn| {
-        let length = resp_data.len();
+        let length = new_data_vec.len();
         async move {
             insert_into(schema::local_files::table)
                 .values((
@@ -196,9 +240,9 @@ async fn create_object_from_web(
             app_state
                 .s3_client
                 .put_object()
-                .body(ByteStream::from(resp_data))
+                .body(ByteStream::from(new_data_vec))
                 .bucket(BUCKET)
-                .content_type(content_type.to_string())
+                .content_type(new_content_type.to_string())
                 .content_length(length as i64)
                 .key(&key)
                 .send()
@@ -211,6 +255,8 @@ async fn create_object_from_web(
     })
     .await
     .map_err(transaction_error_to_status)?;
+
+    info!("Object created: {}", md5_);
 
     Ok(Json(InsertResponse { id: md5_ }))
 }
@@ -269,6 +315,8 @@ async fn delete_object(
     })
     .await
     .map_err(transaction_error_to_status)?;
+
+    info!("Object deleted: {}", id);
 
     Ok(Json(DeleteResponse { id }))
 }
