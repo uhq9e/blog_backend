@@ -13,6 +13,7 @@ use std::env;
 
 mod db;
 mod models;
+mod schedule_jobs;
 mod schema;
 mod utils;
 
@@ -26,10 +27,7 @@ pub struct AppState {
     pub s3_client: aws_sdk_s3::Client,
 }
 
-#[launch]
-async fn rocket() -> _ {
-    dotenv().ok();
-
+pub async fn create_s3_client() -> aws_sdk_s3::Client {
     let config = aws_config::defaults(BehaviorVersion::v2023_11_09())
         .credentials_provider(EnvironmentVariableCredentialsProvider::new())
         .endpoint_url(env::var("S3_ENDPOINT_URL").expect("未设置S3_ENDPOINT_URL"))
@@ -37,7 +35,14 @@ async fn rocket() -> _ {
         .load()
         .await;
 
-    let client = aws_sdk_s3::Client::new(&config);
+    aws_sdk_s3::Client::new(&config)
+}
+
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
+    dotenv().ok();
+
+    let client = create_s3_client().await;
 
     let app_state = AppState {
         database_url: env::var("DATABASE_URL").expect("未设置DATABASE_URL"),
@@ -57,6 +62,8 @@ async fn rocket() -> _ {
         ..rocket::Config::default()
     };
 
+    schedule_jobs::init(app_state.database_url.to_owned()).await;
+
     rocket::custom(&config)
         .manage(pool)
         .manage(app_state)
@@ -64,4 +71,10 @@ async fn rocket() -> _ {
         .mount("/api/images", routes::images::routes())
         .mount("/api/auth", routes::auth::routes())
         .mount("/api/storage", routes::storage::routes())
+        .ignite()
+        .await?
+        .launch()
+        .await?;
+
+    Ok(())
 }

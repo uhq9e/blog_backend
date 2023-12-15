@@ -626,6 +626,7 @@ dependencies = [
  "bb8 0.8.1",
  "bb8-diesel",
  "chrono",
+ "clokwerk",
  "diesel 2.1.4",
  "diesel-async",
  "diesel-order-with-direction",
@@ -724,6 +725,15 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "windows-targets",
+]
+
+[[package]]
+name = "clokwerk"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd108d365fcb6d7eddf17a6718eb6a33db18ba4178f8cc6b667f480710f10d76"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]

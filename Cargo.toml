@@ -13,6 +13,7 @@ aws-smithy-runtime-api = "1.0.1"
 bb8 = "0.8.1"
 bb8-diesel = "0.2.1"
 chrono = "0.4.31"
+clokwerk = "0.4.0"
 diesel = { version = "2.1.4", features = ["postgres", "r2d2", "chrono", "uuid"] }
 diesel-async = { version = "0.4.1", features = ["postgres", "bb8"] }
 diesel-order-with-direction = "0.2.2"
