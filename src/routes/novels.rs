@@ -33,6 +33,8 @@ async fn list_items(
     id: Option<i32>,
     title: Option<String>,
     description: Option<String>,
+    author_name: Option<String>,
+    author_url: Option<String>,
     object_id: Option<i32>,
     created_by: Option<i32>,
     pg: Pagination,
@@ -62,6 +64,18 @@ async fn list_items(
         query_count = query_count.filter(schema::novels::description.like(val));
     }
 
+    // 以author_name筛选
+    if let Some(val) = author_name {
+        query = query.filter(schema::novels::author_name.like(val.to_owned()));
+        query_count = query_count.filter(schema::novels::author_name.like(val));
+    }
+
+    // 以author_url筛选
+    if let Some(val) = author_url {
+        query = query.filter(schema::novels::author_url.like(val.to_owned()));
+        query_count = query_count.filter(schema::novels::author_url.like(val));
+    }
+
     // 以object_id筛选
     if let Some(val) = object_id {
         query = query.filter(schema::novels::object_id.eq(val));
@@ -82,6 +96,12 @@ async fn list_items(
                 "title" => query.then_order_by_with_dir(order.direction, schema::novels::title),
                 "description" => {
                     query.then_order_by_with_dir(order.direction, schema::novels::description)
+                }
+                "author_name" => {
+                    query.then_order_by_with_dir(order.direction, schema::novels::author_name)
+                }
+                "author_url" => {
+                    query.then_order_by_with_dir(order.direction, schema::novels::author_url)
                 }
                 "object_id" => {
                     query.then_order_by_with_dir(order.direction, schema::novels::object_id)
@@ -148,6 +168,8 @@ async fn get_item(db: &State<db::Pool>, id: i32) -> Result<Json<ItemFull>, Statu
 struct NewItemForm {
     title: String,
     description: Option<String>,
+    author_name: String,
+    author_url: Option<String>,
     object_id: i32,
     created_by: Option<i32>,
 }
@@ -168,6 +190,8 @@ async fn create_item(
                     .values((
                         schema::novels::title.eq(&data.title),
                         schema::novels::description.eq(&data.description),
+                        schema::novels::author_name.eq(&data.author_name),
+                        schema::novels::author_url.eq(&data.author_url),
                         schema::novels::object_id.eq(data.object_id),
                         schema::novels::created_by.eq(data.created_by),
                     ))
@@ -196,6 +220,8 @@ async fn create_item(
 struct ItemForUpdate {
     title: Option<String>,
     description: Option<String>,
+    author_name: Option<String>,
+    author_url: Option<String>,
     object_id: Option<i32>,
     created_by: Option<i32>,
 }
@@ -204,6 +230,8 @@ impl ItemForUpdate {
     fn is_empty(&self) -> bool {
         self.title.is_none()
             && self.description.is_none()
+            && self.author_name.is_none()
+            && self.author_url.is_none()
             && self.object_id.is_none()
             && self.created_by.is_none()
     }
