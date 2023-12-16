@@ -40,7 +40,7 @@ impl<T> From<diesel::result::Error> for TransactionError<T> {
     }
 }
 
-#[post("/image/item", data = "<file>")]
+#[post("/item", data = "<file>")]
 async fn create_object(
     app_state: &State<AppState>,
     auth: Option<ApiTokenClaims>,
@@ -61,7 +61,7 @@ async fn create_object(
     let mut data_vec: Vec<u8> = vec![];
     io::copy(&mut data_stream, &mut data_vec)
         .await
-        .map_err(|_| Status::BadRequest)?;
+        .map_err(|_| Status::InternalServerError)?;
 
     let mut new_data_vec: Vec<u8> = Vec::new();
     ImageReader::new(Cursor::new(data_vec))
@@ -144,7 +144,7 @@ async fn create_object(
     Ok(Json(InsertResponse { id: md5_ }))
 }
 
-#[post("/image/item_from_web", data = "<url>")]
+#[post("/item_from_web", data = "<url>")]
 async fn create_object_from_web(
     app_state: &State<AppState>,
     auth: Option<ApiTokenClaims>,

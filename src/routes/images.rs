@@ -267,7 +267,7 @@ impl From<UpdateImageItemForm> for ImageItemForUpdate {
 
 impl ImageItemForUpdate {
     fn is_empty(&self) -> bool {
-        self.urls.is_none() || self.date.is_none() || self.author_id.is_none()
+        self.urls.is_none() && self.date.is_none() && self.author_id.is_none()
     }
 }
 

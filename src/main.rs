@@ -9,11 +9,11 @@ use aws_config::{
 use aws_sdk_s3;
 use dotenvy::dotenv;
 use env_logger;
-use log::info;
 use rocket::data::ToByteUnit;
 use std::env;
 
 mod db;
+mod misc;
 mod models;
 mod schedule_jobs;
 mod schema;
@@ -74,7 +74,9 @@ async fn main() -> Result<(), rocket::Error> {
         .mount("/api/authors", routes::authors::routes())
         .mount("/api/images", routes::images::routes())
         .mount("/api/auth", routes::auth::routes())
-        .mount("/api/storage", routes::storage::routes())
+        .mount("/api/storage/image", routes::storage::image::routes())
+        .mount("/api/storage/content", routes::storage::content::routes())
+        .mount("/api/novels", routes::novels::routes())
         .ignite()
         .await?
         .launch()

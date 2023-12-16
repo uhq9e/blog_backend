@@ -1,0 +1,11 @@
+CREATE TABLE site_storage (
+    id SERIAL PRIMARY KEY,
+    file_name TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    size BIGINT NOT NULL,
+    hash TEXT NOT NULL,
+    kind SMALLINT NOT NULL,
+    mime_type TEXT NOT NULL,
+    created_by INTEGER NULL DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

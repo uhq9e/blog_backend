@@ -51,11 +51,37 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    novels (id) {
+        id -> Int4,
+        title -> Text,
+        description -> Nullable<Text>,
+        object_id -> Nullable<Int4>,
+        created_by -> Nullable<Int4>,
+        created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    site_storage (id) {
+        id -> Int4,
+        file_name -> Text,
+        key -> Text,
+        size -> Int8,
+        hash -> Text,
+        kind -> Int2,
+        mime_type -> Text,
+        created_by -> Nullable<Int4>,
+        created_at -> Timestamptz,
+    }
+}
+
 diesel::joinable!(image_collections_image_items -> image_collections (image_collection_id));
 diesel::joinable!(image_collections_image_items -> image_items (image_item_id));
 diesel::joinable!(image_items -> authors (author_id));
 diesel::joinable!(image_items_local_files -> image_items (image_item_id));
 diesel::joinable!(image_items_local_files -> local_files (local_file_id));
+diesel::joinable!(novels -> site_storage (object_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     authors,
@@ -64,4 +90,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     image_items,
     image_items_local_files,
     local_files,
+    novels,
+    site_storage,
 );
