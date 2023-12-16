@@ -58,6 +58,7 @@ diesel::table! {
         description -> Nullable<Text>,
         author_name -> Text,
         author_url -> Nullable<Text>,
+        nsfw -> Bool,
         object_id -> Nullable<Int4>,
         created_by -> Nullable<Int4>,
         created_at -> Timestamptz,

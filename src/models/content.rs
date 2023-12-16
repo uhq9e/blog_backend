@@ -12,6 +12,7 @@ pub struct Novel {
     pub description: Option<String>,
     pub author_name: String,
     pub author_url: Option<String>,
+    pub nsfw: bool,
     pub object_id: Option<i32>,
     pub created_by: Option<i32>,
     #[serde(with = "datetime_format")]

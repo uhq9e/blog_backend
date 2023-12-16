@@ -28,7 +28,7 @@ struct ItemFull {
 }
 
 #[get(
-    "/item?<id>&<title>&<description>&<author_name>&<author_url>&<object_id>&<created_by>&<pg..>"
+    "/item?<id>&<title>&<description>&<author_name>&<author_url>&<nsfw>&<object_id>&<created_by>&<pg..>"
 )]
 async fn list_items(
     db: &State<db::Pool>,
@@ -37,6 +37,7 @@ async fn list_items(
     description: Option<String>,
     author_name: Option<String>,
     author_url: Option<String>,
+    nsfw: Option<bool>,
     object_id: Option<i32>,
     created_by: Option<i32>,
     pg: Pagination,
@@ -52,31 +53,37 @@ async fn list_items(
     if let Some(val) = id {
         query = query.filter(schema::novels::id.eq(val));
         query_count = query_count.filter(schema::novels::id.eq(val));
-    }
+    };
 
     // 以title筛选
     if let Some(val) = title {
         query = query.filter(schema::novels::title.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::title.like(val));
-    }
+    };
 
     // 以description筛选
     if let Some(val) = description {
         query = query.filter(schema::novels::description.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::description.like(val));
-    }
+    };
 
     // 以author_name筛选
     if let Some(val) = author_name {
         query = query.filter(schema::novels::author_name.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::author_name.like(val));
-    }
+    };
 
     // 以author_url筛选
     if let Some(val) = author_url {
         query = query.filter(schema::novels::author_url.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::author_url.like(val));
-    }
+    };
+
+    // 以object_id筛选
+    if let Some(val) = nsfw {
+        query = query.filter(schema::novels::nsfw.eq(val));
+        query_count = query_count.filter(schema::novels::nsfw.eq(val));
+    };
 
     // 以object_id筛选
     if let Some(val) = object_id {
@@ -105,6 +112,7 @@ async fn list_items(
                 "author_url" => {
                     query.then_order_by_with_dir(order.direction, schema::novels::author_url)
                 }
+                "nsfw" => query.then_order_by_with_dir(order.direction, schema::novels::nsfw),
                 "object_id" => {
                     query.then_order_by_with_dir(order.direction, schema::novels::object_id)
                 }
@@ -172,6 +180,7 @@ struct NewItemForm {
     description: Option<String>,
     author_name: String,
     author_url: Option<String>,
+    nsfw: bool,
     object_id: i32,
     created_by: Option<i32>,
 }
@@ -194,6 +203,7 @@ async fn create_item(
                         schema::novels::description.eq(&data.description),
                         schema::novels::author_name.eq(&data.author_name),
                         schema::novels::author_url.eq(&data.author_url),
+                        schema::novels::nsfw.eq(data.nsfw),
                         schema::novels::object_id.eq(data.object_id),
                         schema::novels::created_by.eq(data.created_by),
                     ))
@@ -224,6 +234,7 @@ struct ItemForUpdate {
     description: Option<String>,
     author_name: Option<String>,
     author_url: Option<String>,
+    nsfw: Option<bool>,
     object_id: Option<i32>,
     created_by: Option<i32>,
 }
@@ -234,6 +245,7 @@ impl ItemForUpdate {
             && self.description.is_none()
             && self.author_name.is_none()
             && self.author_url.is_none()
+            && self.nsfw.is_none()
             && self.object_id.is_none()
             && self.created_by.is_none()
     }
