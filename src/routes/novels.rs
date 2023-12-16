@@ -27,7 +27,9 @@ struct ItemFull {
     object: Option<SiteStorage>,
 }
 
-#[get("/item?<id>&<title>&<description>&<object_id>&<created_by>&<pg..>")]
+#[get(
+    "/item?<id>&<title>&<description>&<author_name>&<author_url>&<object_id>&<created_by>&<pg..>"
+)]
 async fn list_items(
     db: &State<db::Pool>,
     id: Option<i32>,
