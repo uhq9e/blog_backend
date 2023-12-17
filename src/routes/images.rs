@@ -193,11 +193,20 @@ async fn create_image_item(
                     .values((
                         schema::image_items::author_id.eq(data.author_id),
                         schema::image_items::urls.eq(&data.urls),
-                        schema::image_items::date.eq(data.date),
+                        schema::image_items::date.eq(&data.date),
                         schema::image_items::nsfw.eq(data.nsfw),
                     ))
                     .returning(schema::image_items::id)
                     .get_result::<i32>(conn)
+                    .await
+                    .map_err(|err| TransactionError::ResultError(err))?;
+
+                insert_into(schema::image_items_grouped::table)
+                    .values((
+                        schema::image_items_grouped::image_item_id.eq(image_item_id),
+                        schema::image_items_grouped::date.eq(data.date),
+                    ))
+                    .execute(conn)
                     .await
                     .map_err(|err| TransactionError::ResultError(err))?;
 
@@ -301,6 +310,14 @@ async fn update_image_item(
                     .execute(conn)
                     .await?;
             };
+
+            if let Some(date) = data.date {
+                update(schema::image_items_grouped::table)
+                    .filter(schema::image_items_grouped::image_item_id.eq(id))
+                    .set(schema::image_items_grouped::date.eq(date))
+                    .execute(conn)
+                    .await?;
+            }
 
             if let Some(local_file_ids) = data.local_file_ids {
                 delete(schema::image_items_local_files::table)

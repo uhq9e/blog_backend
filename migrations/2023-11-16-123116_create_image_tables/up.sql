@@ -25,15 +25,9 @@ CREATE TABLE image_items_local_files (
     local_file_id TEXT NOT NULL REFERENCES local_files(id) ON DELETE CASCADE
 );
 
-CREATE TABLE image_collections (
-	id SERIAL4 PRIMARY KEY,
-    "description" TEXT NULL,
-	"date" DATE NOT NULL DEFAULT CURRENT_DATE
-);
-
-CREATE TABLE image_collections_image_items (
+CREATE TABLE image_items_grouped (
     id SERIAL4 NOT NULL PRIMARY KEY,
-    image_collection_id INT4 NOT NULL REFERENCES image_collections(id) ON DELETE CASCADE,
-    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE
+    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE,
+    "date" date NOT NULL
 );
 

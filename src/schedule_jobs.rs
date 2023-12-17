@@ -13,14 +13,15 @@ use log::info;
 use std::time::Duration;
 
 pub async fn init(db_url: String) -> () {
-    let pool = db::establish_connection(db_url.to_owned()).await;
     let mut scheduler = AsyncScheduler::new();
 
     // Clear unreferenced objects
+    let db_url_a = db_url.to_owned();
     scheduler.every(1.day()).at("00:00").run(move || {
-        let pool = pool.clone();
+        let db_url = db_url_a.to_owned();
         let mut local_files: Vec<(LocalFile, Option<ImageItemLocalFile>)> = vec![];
         async move {
+            let pool = db::establish_connection(db_url).await;
             let mut conn = pool.get().await.unwrap();
             let s3_client = create_s3_client().await;
             local_files = schema::local_files::table
@@ -64,6 +65,42 @@ pub async fn init(db_url: String) -> () {
                     })
                     .await;
             }
+        }
+    });
+
+    //Re-group image items
+    let db_url_b = db_url.to_owned();
+    scheduler.every(1.day()).at("00:00").run(move || {
+        let db_url = db_url_b.to_owned();
+        async move {
+            let pool = db::establish_connection(db_url).await;
+            let mut conn = pool.get().await.unwrap();
+            let image_items = schema::image_items::table
+                .select(schema::image_items::all_columns)
+                .load::<crate::models::ImageItem>(&mut conn)
+                .await
+                .unwrap();
+
+            diesel::delete(schema::image_items_grouped::table)
+                .execute(&mut conn)
+                .await
+                .unwrap();
+
+            diesel::insert_into(schema::image_items_grouped::table)
+                .values(
+                    image_items
+                        .iter()
+                        .map(|i| {
+                            (
+                                schema::image_items_grouped::image_item_id.eq(i.id),
+                                schema::image_items_grouped::date.eq(i.date),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .execute(&mut conn)
+                .await
+                .unwrap();
         }
     });
 

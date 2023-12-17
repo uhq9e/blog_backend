@@ -14,35 +14,6 @@ pub struct Author {
     pub urls: Option<Vec<Option<String>>>,
 }
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Identifiable, Deserialize, Serialize)]
-pub struct ImageCollection {
-    pub id: i32,
-    pub description: Option<String>,
-    #[serde(with = "naive_date_format")]
-    pub date: NaiveDate,
-}
-
-#[derive(
-    Queryable,
-    Selectable,
-    Insertable,
-    Debug,
-    Clone,
-    Identifiable,
-    Associations,
-    Deserialize,
-    Serialize,
-)]
-#[diesel(belongs_to(ImageCollection))]
-#[diesel(belongs_to(ImageItem))]
-#[diesel(primary_key(image_collection_id, image_item_id))]
-#[diesel(table_name = image_collections_image_items)]
-pub struct ImageCollectionImageItem {
-    pub id: i32,
-    pub image_collection_id: i32,
-    pub image_item_id: i32,
-}
-
 #[derive(
     Queryable,
     Selectable,
@@ -91,4 +62,24 @@ pub struct ImageItemLocalFile {
     pub id: i32,
     pub image_item_id: i32,
     pub local_file_id: String,
+}
+
+#[derive(
+    Queryable,
+    Selectable,
+    Insertable,
+    Debug,
+    Clone,
+    Identifiable,
+    Associations,
+    Serialize,
+    Deserialize,
+)]
+#[diesel(belongs_to(ImageItem))]
+#[diesel(table_name = image_items_grouped)]
+pub struct ImageItemGrouped {
+    pub id: i32,
+    pub image_item_id: i32,
+    #[serde(with = "naive_date_format")]
+    pub date: NaiveDate,
 }

@@ -1,6 +1,7 @@
-DROP TABLE image_collections_image_items;
-DROP TABLE image_collections;
-DROP TABLE image_items_local_files;
-DROP TABLE local_files;
-DROP TABLE image_items;
-DROP TABLE authors;
+DROP TABLE IF EXISTS image_collections_image_items;
+DROP TABLE IF EXISTS image_collections;
+DROP TABLE IF EXISTS image_items_grouped;
+DROP TABLE IF EXISTS image_items_local_files;
+DROP TABLE IF EXISTS local_files;
+DROP TABLE IF EXISTS image_items;
+DROP TABLE IF EXISTS authors;
