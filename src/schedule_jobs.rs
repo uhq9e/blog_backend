@@ -75,32 +75,39 @@ pub async fn init(db_url: String) -> () {
         async move {
             let pool = db::establish_connection(db_url).await;
             let mut conn = pool.get().await.unwrap();
-            let image_items = schema::image_items::table
-                .select(schema::image_items::all_columns)
-                .load::<crate::models::ImageItem>(&mut conn)
-                .await
-                .unwrap();
 
-            diesel::delete(schema::image_items_grouped::table)
-                .execute(&mut conn)
-                .await
-                .unwrap();
+            conn.transaction::<(), diesel::result::Error, _>(|conn| {
+                async move {
+                    let image_items = schema::image_items::table
+                        .select(schema::image_items::all_columns)
+                        .load::<crate::models::ImageItem>(conn)
+                        .await?;
 
-            diesel::insert_into(schema::image_items_grouped::table)
-                .values(
-                    image_items
-                        .iter()
-                        .map(|i| {
-                            (
-                                schema::image_items_grouped::image_item_id.eq(i.id),
-                                schema::image_items_grouped::date.eq(i.date),
-                            )
-                        })
-                        .collect::<Vec<_>>(),
-                )
-                .execute(&mut conn)
-                .await
-                .unwrap();
+                    diesel::delete(schema::image_items_grouped::table)
+                        .execute(conn)
+                        .await?;
+
+                    diesel::insert_into(schema::image_items_grouped::table)
+                        .values(
+                            image_items
+                                .iter()
+                                .map(|i| {
+                                    (
+                                        schema::image_items_grouped::image_item_id.eq(i.id),
+                                        schema::image_items_grouped::date.eq(i.date),
+                                    )
+                                })
+                                .collect::<Vec<_>>(),
+                        )
+                        .execute(conn)
+                        .await?;
+
+                    Ok(())
+                }
+                .scope_boxed()
+            })
+            .await
+            .unwrap();
         }
     });
 

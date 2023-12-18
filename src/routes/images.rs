@@ -7,7 +7,7 @@ use crate::{
     utils::{
         naive_date_format, naive_date_format_option, parse_order_from_string, response::*,
         result_error_to_status, result_error_to_status_failed_dependency, sdk_error_to_status,
-        ApiTokenClaims, PaginationHighLimit, TransactionError,
+        ApiTokenClaims, Pagination, PaginationHighLimit, TransactionError,
     },
 };
 use aws_sdk_s3::operation::put_object::PutObjectError;
@@ -135,6 +135,78 @@ async fn list_image_items(
 
     Ok(Json(ListResponse::new(results).count(count)))
 }
+
+/*
+#[get("/items_by_date/<date>?<pg..>")]
+async fn list_image_items_by_date(
+    db: &State<db::Pool>,
+    date: String,
+    pg: Pagination,
+) -> Result<Json<ListResponse<ImageItemFull>>, Status> {
+    let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
+
+    let sub_query = schema::image_items_grouped::table
+        .select(schema::image_items_grouped::date)
+        .distinct_on(schema::image_items_grouped::date)
+        .order(schema::image_items_grouped::date.desc())
+        .limit(10);
+
+    let results = schema::image_items_grouped::table
+        .inner_join(schema::image_items::table)
+        .filter(schema::image_items_grouped::date.eq_any(sub_query))
+        .order(schema::image_items_grouped::date.desc())
+        .load::<(ImageItemGrouped, ImageItem)>(&mut conn)
+        .await
+        .expect("Error loading posts");
+
+    let items_batch: Vec<(ImageItem, Option<Author>)> = schema::image_items::table
+        .left_join(schema::authors::table)
+        .offset(pg.offset)
+        .limit(pg.limit)
+        .load::<(ImageItem, Option<Author>)>(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    let image_items: Vec<ImageItem> = items_batch.iter().map(|item| item.0.to_owned()).collect();
+
+    let authors: Vec<Option<Author>> = items_batch.iter().map(|item| item.1.to_owned()).collect();
+
+    let all_local_files: Vec<(ImageItemLocalFile, LocalFile)> =
+        ImageItemLocalFile::belonging_to(&image_items)
+            .inner_join(schema::local_files::table)
+            .select((ImageItemLocalFile::as_select(), LocalFile::as_select()))
+            .load(&mut conn)
+            .await
+            .map_err(|_| Status::InternalServerError)?;
+
+    let local_files: Vec<Vec<LocalFile>> = all_local_files
+        .grouped_by(&image_items)
+        .into_iter()
+        .zip(&image_items)
+        .map(|(b, _)| {
+            b.into_iter()
+                .map(|(_, local_file_item)| local_file_item)
+                .collect()
+        })
+        .collect();
+
+    let results = izip!(&image_items, &authors, &local_files)
+        .map(|(image_item, author, local_files)| ImageItemFull {
+            image_item: image_item.to_owned(),
+            author: author.to_owned(),
+            local_files: local_files.to_owned(),
+        })
+        .collect();
+
+    let count = schema::image_items::table
+        .count()
+        .get_result(&mut conn)
+        .await
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(ListResponse::new(results).count(count)))
+}
+*/
 
 #[get("/item/<id>")]
 async fn get_image_item(db: &State<db::Pool>, id: i32) -> Result<Json<ImageItemFull>, Status> {

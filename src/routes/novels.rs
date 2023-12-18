@@ -28,13 +28,14 @@ struct ItemFull {
 }
 
 #[get(
-    "/item?<id>&<title>&<description>&<author_name>&<author_url>&<nsfw>&<object_id>&<created_by>&<pg..>"
+    "/item?<id>&<title>&<description>&<url>&<author_name>&<author_url>&<nsfw>&<object_id>&<created_by>&<pg..>"
 )]
 async fn list_items(
     db: &State<db::Pool>,
     id: Option<i32>,
     title: Option<String>,
     description: Option<String>,
+    url: Option<String>,
     author_name: Option<String>,
     author_url: Option<String>,
     nsfw: Option<bool>,
@@ -65,6 +66,12 @@ async fn list_items(
     if let Some(val) = description {
         query = query.filter(schema::novels::description.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::description.like(val));
+    };
+
+    // 以url筛选
+    if let Some(val) = url {
+        query = query.filter(schema::novels::url.like(val.to_owned()));
+        query_count = query_count.filter(schema::novels::url.like(val));
     };
 
     // 以author_name筛选
@@ -178,9 +185,11 @@ async fn get_item(db: &State<db::Pool>, id: i32) -> Result<Json<ItemFull>, Statu
 struct NewItemForm {
     title: String,
     description: Option<String>,
+    url: Option<String>,
     author_name: String,
     author_url: Option<String>,
     nsfw: bool,
+    tags: Vec<String>,
     object_id: i32,
     created_by: Option<i32>,
 }
@@ -201,9 +210,11 @@ async fn create_item(
                     .values((
                         schema::novels::title.eq(&data.title),
                         schema::novels::description.eq(&data.description),
+                        schema::novels::url.eq(&data.url),
                         schema::novels::author_name.eq(&data.author_name),
                         schema::novels::author_url.eq(&data.author_url),
                         schema::novels::nsfw.eq(data.nsfw),
+                        schema::novels::tags.eq(&data.tags),
                         schema::novels::object_id.eq(data.object_id),
                         schema::novels::created_by.eq(data.created_by),
                     ))
@@ -232,9 +243,11 @@ async fn create_item(
 struct ItemForUpdate {
     title: Option<String>,
     description: Option<String>,
+    url: Option<String>,
     author_name: Option<String>,
     author_url: Option<String>,
     nsfw: Option<bool>,
+    tags: Option<Vec<String>>,
     object_id: Option<i32>,
     created_by: Option<i32>,
 }
@@ -243,9 +256,11 @@ impl ItemForUpdate {
     fn is_empty(&self) -> bool {
         self.title.is_none()
             && self.description.is_none()
+            && self.url.is_none()
             && self.author_name.is_none()
             && self.author_url.is_none()
             && self.nsfw.is_none()
+            && self.tags.is_none()
             && self.object_id.is_none()
             && self.created_by.is_none()
     }
