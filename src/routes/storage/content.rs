@@ -73,7 +73,7 @@ pub async fn create_novel_object(
 
     let filename = format!(
         "{}.{}",
-        Uuid::new_v4().to_string(),
+        Uuid::new_v4().simple().to_string(),
         content_type.extension().unwrap().as_str()
     );
 
