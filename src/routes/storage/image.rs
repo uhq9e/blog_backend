@@ -108,7 +108,7 @@ async fn create_object(
             .to_owned();
         */
         let new_content_type = ContentType::WEBP;
-        let length = file.len().to_owned();
+        let length = new_data_vec.len();
         async move {
             insert_into(schema::local_files::table)
                 .values((

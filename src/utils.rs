@@ -42,6 +42,7 @@ pub enum ApiTokenError {
     FormatError,
 }
 
+#[derive(Debug)]
 pub enum TransactionError<T> {
     ResultError(diesel::result::Error),
     SdkError(SdkError<T, Response<SdkBody>>),
