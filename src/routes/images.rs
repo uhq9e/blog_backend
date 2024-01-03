@@ -103,7 +103,7 @@ async fn list_image_items(
     let all_local_files: Vec<(ImageItemLocalFile, LocalFile)> =
         ImageItemLocalFile::belonging_to(&image_items)
             .inner_join(schema::local_files::table)
-            .order(schema::local_files::id.asc())
+            .order(schema::image_items_local_files::id.asc())
             .select((ImageItemLocalFile::as_select(), LocalFile::as_select()))
             .load(&mut conn)
             .await
