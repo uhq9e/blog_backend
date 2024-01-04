@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, HashMap};
 use std::ops::Deref;
 
 use crate::{
@@ -21,10 +22,12 @@ use diesel::{
     delete, insert_into, result::DatabaseErrorKind, update, AsChangeset, BelongingToDsl,
     ExpressionMethods, GroupedBy, QueryDsl, SelectableHelper,
 };
+use diesel::dsl::sql;
+use diesel::sql_types::BigInt;
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use log::info;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 struct ImageItemFull {
     #[serde(flatten)]
     image_item: ImageItem,
@@ -137,40 +140,50 @@ async fn list_image_items(
     Ok(Json(ListResponse::new(results).count(count)))
 }
 
-/*
-#[get("/items_by_date/<date>?<pg..>")]
+#[get("/items_by_date?<pg..>")]
 async fn list_image_items_by_date(
     db: &State<db::Pool>,
-    date: String,
     pg: Pagination,
-) -> Result<Json<ListResponse<ImageItemFull>>, Status> {
+) -> Result<Json<ListResponse<Vec<(String, Vec<ImageItemFull>)>>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
     let sub_query = schema::image_items_grouped::table
         .select(schema::image_items_grouped::date)
         .distinct_on(schema::image_items_grouped::date)
         .order(schema::image_items_grouped::date.desc())
-        .limit(10);
-
-    let results = schema::image_items_grouped::table
-        .inner_join(schema::image_items::table)
-        .filter(schema::image_items_grouped::date.eq_any(sub_query))
-        .order(schema::image_items_grouped::date.desc())
-        .load::<(ImageItemGrouped, ImageItem)>(&mut conn)
+        .offset(pg.offset)
+        .limit(pg.limit)
+        .load::<NaiveDate>(&mut conn)
         .await
         .expect("Error loading posts");
 
-    let items_batch: Vec<(ImageItem, Option<Author>)> = schema::image_items::table
-        .left_join(schema::authors::table)
-        .offset(pg.offset)
-        .limit(pg.limit)
-        .load::<(ImageItem, Option<Author>)>(&mut conn)
+    let image_items: Vec<ImageItem> = schema::image_items_grouped::table
+        .inner_join(schema::image_items::table)
+        .filter(schema::image_items_grouped::date.eq_any(sub_query))
+        .select(ImageItem::as_select())
+        .load::<ImageItem>(&mut conn)
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .expect("Error loading posts");
 
-    let image_items: Vec<ImageItem> = items_batch.iter().map(|item| item.0.to_owned()).collect();
+    let authors = schema::authors::table
+        .filter(
+            schema::authors::id.eq_any(
+                image_items
+                    .iter()
+                    .map(|item| item.author_id.map_or(0, |v| v)),
+            ),
+        )
+        .load::<Author>(&mut conn)
+        .await
+        .expect("Error loading authors")
+        .iter()
+        .map(|v| (v.id, v.to_owned()))
+        .collect::<Vec<(i32, Author)>>();
 
-    let authors: Vec<Option<Author>> = items_batch.iter().map(|item| item.1.to_owned()).collect();
+    let mut author_map = HashMap::new();
+    for (id, author) in &authors {
+        author_map.insert(id, author);
+    }
 
     let all_local_files: Vec<(ImageItemLocalFile, LocalFile)> =
         ImageItemLocalFile::belonging_to(&image_items)
@@ -191,23 +204,35 @@ async fn list_image_items_by_date(
         })
         .collect();
 
-    let results = izip!(&image_items, &authors, &local_files)
-        .map(|(image_item, author, local_files)| ImageItemFull {
+    let results = izip!(&image_items, &local_files)
+        .map(|(image_item, local_files)| ImageItemFull {
             image_item: image_item.to_owned(),
-            author: author.to_owned(),
+            author: if !image_item.author_id.is_none() {
+                author_map.get(&image_item.author_id.unwrap()).map(|v| v.to_owned().to_owned())
+            } else {
+                None
+            },
             local_files: local_files.to_owned(),
         })
-        .collect();
+        .collect::<Vec<ImageItemFull>>();
+
+    let mut map: BTreeMap<NaiveDate, Vec<ImageItemFull>> = BTreeMap::new();
+    for item in results {
+        map.entry(item.image_item.date)
+            .or_insert_with(Vec::new)
+            .push(item);
+    }
+
+    let grouped_result = map.iter().rev().map(|(k, v)| (k.to_string(), v.to_vec())).collect::<Vec<_>>();
 
     let count = schema::image_items::table
-        .count()
-        .get_result(&mut conn)
+        .select(sql::<BigInt>("COUNT(DISTINCT date)"))
+        .first(&mut conn)
         .await
         .map_err(|_| Status::InternalServerError)?;
 
-    Ok(Json(ListResponse::new(results).count(count)))
+    Ok(Json(ListResponse::new(vec![grouped_result]).count(count)))
 }
-*/
 
 #[get("/item/<id>")]
 async fn get_image_item(db: &State<db::Pool>, id: i32) -> Result<Json<ImageItemFull>, Status> {
@@ -461,6 +486,7 @@ async fn delete_image_item(
 pub fn routes() -> Vec<Route> {
     routes![
         list_image_items,
+        list_image_items_by_date,
         create_image_item,
         get_image_item,
         update_image_item,
