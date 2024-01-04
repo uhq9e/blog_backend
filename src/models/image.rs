@@ -77,8 +77,8 @@ pub struct ImageItemLocalFile {
 )]
 #[diesel(belongs_to(ImageItem))]
 #[diesel(table_name = image_items_grouped)]
+#[diesel(primary_key(image_item_id))]
 pub struct ImageItemGrouped {
-    pub id: i32,
     pub image_item_id: i32,
     #[serde(with = "naive_date_format")]
     pub date: NaiveDate,

@@ -19,8 +19,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    image_items_grouped (id) {
-        id -> Int4,
+    image_items_grouped (image_item_id) {
         image_item_id -> Int4,
         date -> Date,
     }

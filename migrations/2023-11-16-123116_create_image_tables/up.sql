@@ -26,8 +26,7 @@ CREATE TABLE image_items_local_files (
 );
 
 CREATE TABLE image_items_grouped (
-    id SERIAL4 NOT NULL PRIMARY KEY,
-    image_item_id INT4 NOT NULL REFERENCES image_items(id) ON DELETE CASCADE,
+    image_item_id INT4 NOT NULL PRIMARY KEY REFERENCES image_items(id) ON DELETE CASCADE,
     "date" date NOT NULL
 );
 
