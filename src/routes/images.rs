@@ -144,7 +144,7 @@ async fn list_image_items(
 async fn list_image_items_by_date(
     db: &State<db::Pool>,
     pg: Pagination,
-) -> Result<Json<ListResponse<Vec<(String, Vec<ImageItemFull>)>>>, Status> {
+) -> Result<Json<ListResponse<(String, Vec<ImageItemFull>)>>, Status> {
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
     let sub_query = schema::image_items_grouped::table
@@ -231,7 +231,7 @@ async fn list_image_items_by_date(
         .await
         .map_err(|_| Status::InternalServerError)?;
 
-    Ok(Json(ListResponse::new(vec![grouped_result]).count(count)))
+    Ok(Json(ListResponse::new(grouped_result).count(count)))
 }
 
 #[get("/item/<id>")]
