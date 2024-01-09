@@ -11,6 +11,9 @@ use dotenvy::dotenv;
 use env_logger;
 use rocket::data::ToByteUnit;
 use std::env;
+use reqwest;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 
 mod db;
 mod misc;
@@ -27,6 +30,7 @@ pub struct AppState {
     pub database_url: String,
     pub jwt_signing_key: String,
     pub s3_client: aws_sdk_s3::Client,
+    pub reqwest_client: ClientWithMiddleware,
 }
 
 pub async fn create_s3_client() -> aws_sdk_s3::Client {
@@ -46,12 +50,19 @@ async fn main() -> Result<(), rocket::Error> {
 
     env_logger::init();
 
-    let client = create_s3_client().await;
+    let s3_client = create_s3_client().await;
+
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+
+    let reqwest_client = ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build();
 
     let app_state = AppState {
         database_url: env::var("DATABASE_URL").expect("未设置DATABASE_URL"),
         jwt_signing_key: env::var("JWT_SIGNING_KEY").expect("未设置JWT_SIGNING_KEY"),
-        s3_client: client,
+        s3_client,
+        reqwest_client,
     };
 
     let pool = db::establish_connection(app_state.database_url.to_owned()).await;

@@ -17,7 +17,7 @@ use rocket::{
     get,
     http::{ContentType, Status},
     post,
-    serde::{json::Json, Deserialize},
+    serde::json::Json,
     tokio::io,
     Route, State,
 };
@@ -302,9 +302,7 @@ async fn create_object_from_web(
     auth.ok_or(Status::Forbidden)?;
     let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
 
-    let client = reqwest::Client::new();
-
-    let resp_head = client
+    let resp_head = app_state.reqwest_client
         .head(&url)
         .send()
         .await
@@ -326,7 +324,7 @@ async fn create_object_from_web(
         return Err(Status::UnprocessableEntity);
     };
 
-    let resp = client
+    let resp = app_state.reqwest_client
         .get(url)
         .send()
         .await
@@ -427,10 +425,8 @@ async fn create_object_from_web_multi(
 
     let mut pending_datas: Vec<UploadImageItem> = Vec::with_capacity(urls_vec.len());
 
-    let client = reqwest::Client::new();
-
     for url in urls_vec {
-        let resp_head = client
+        let resp_head = app_state.reqwest_client
             .head(&url)
             .send()
             .await
@@ -452,7 +448,7 @@ async fn create_object_from_web_multi(
             return Err(Status::UnprocessableEntity);
         };
 
-        let resp = client
+        let resp = app_state.reqwest_client
             .get(url)
             .send()
             .await
