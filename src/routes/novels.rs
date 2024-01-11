@@ -11,7 +11,7 @@ use crate::{
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use diesel::{
     delete, insert_into, query_builder::AsChangeset, result::DatabaseErrorKind, update,
-    ExpressionMethods, QueryDsl, TextExpressionMethods,
+    ExpressionMethods, QueryDsl, TextExpressionMethods, PgArrayExpressionMethods,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use diesel_order_with_direction::OrderWithDirectionDsl;
@@ -28,13 +28,14 @@ struct ItemFull {
 }
 
 #[get(
-    "/item?<id>&<title>&<description>&<url>&<author_name>&<author_url>&<nsfw>&<object_id>&<created_by>&<pg..>"
+    "/item?<id>&<title>&<description>&<tags>&<url>&<author_name>&<author_url>&<nsfw>&<object_id>&<created_by>&<pg..>"
 )]
 async fn list_items(
     db: &State<db::Pool>,
     id: Option<i32>,
     title: Option<String>,
     description: Option<String>,
+    tags: Option<String>,
     url: Option<String>,
     author_name: Option<String>,
     author_url: Option<String>,
@@ -66,6 +67,13 @@ async fn list_items(
     if let Some(val) = description {
         query = query.filter(schema::novels::description.like(val.to_owned()));
         query_count = query_count.filter(schema::novels::description.like(val));
+    };
+
+    if let Some(val) = tags {
+        let tags_splited = val.clone().trim().split(',').map(|v| v.trim().to_owned()).collect::<Vec<String>>();
+
+        query = query.filter(schema::novels::tags.contains(tags_splited.to_owned()));
+        query_count = query_count.filter(schema::novels::tags.contains(tags_splited));
     };
 
     // 以url筛选
