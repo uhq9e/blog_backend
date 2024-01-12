@@ -9,9 +9,15 @@ use crate::{
     },
 };
 use aws_sdk_s3::operation::put_object::PutObjectError;
+use diesel::sql_types::{BigInt, Text};
 use diesel::{
-    delete, insert_into, query_builder::AsChangeset, result::DatabaseErrorKind, update,
-    ExpressionMethods, QueryDsl, TextExpressionMethods, PgArrayExpressionMethods,
+    delete,
+    deserialize::{Queryable, QueryableByName},
+    insert_into,
+    query_builder::AsChangeset,
+    result::DatabaseErrorKind,
+    sql_query, update, ExpressionMethods, PgArrayExpressionMethods, QueryDsl,
+    TextExpressionMethods,
 };
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 use diesel_order_with_direction::OrderWithDirectionDsl;
@@ -70,7 +76,12 @@ async fn list_items(
     };
 
     if let Some(val) = tags {
-        let tags_splited = val.clone().trim().split(',').map(|v| v.trim().to_owned()).collect::<Vec<String>>();
+        let tags_splited = val
+            .clone()
+            .trim()
+            .split(',')
+            .map(|v| v.trim().to_owned())
+            .collect::<Vec<String>>();
 
         query = query.filter(schema::novels::tags.contains(tags_splited.to_owned()));
         query_count = query_count.filter(schema::novels::tags.contains(tags_splited));
@@ -341,6 +352,26 @@ async fn delete_item(
     Ok(Json(DeleteResponse { id }))
 }
 
+#[derive(Serialize, QueryableByName)]
+struct TagsCount {
+    #[sql_type = "Text"]
+    tag: String,
+    #[sql_type = "BigInt"]
+    count: i64,
+}
+
+#[get("/tags_count")]
+async fn count_tags(db: &State<db::Pool>) -> Result<Json<Vec<TagsCount>>, Status> {
+    let mut conn = db.get().await.map_err(|_| Status::InternalServerError)?;
+
+    let results: Vec<TagsCount> = sql_query("SELECT tag, COUNT(*) FROM (select UNNEST(tags) AS tag FROM novels) t GROUP BY tag ORDER BY count DESC")
+    .load(&mut conn)
+    .await
+    .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(results))
+}
+
 pub fn routes() -> Vec<Route> {
-    routes![list_items, get_item, create_item, update_item, delete_item]
+    routes![list_items, get_item, create_item, update_item, delete_item, count_tags]
 }
